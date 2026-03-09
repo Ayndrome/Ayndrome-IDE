@@ -91,3 +91,22 @@ const DeleteDialog = ({ item, onConfirm, onCancel }: DeleteDialogProps) => (
         </AlertDialogContent>
     </AlertDialog>
 );
+
+
+// ── Recursive File Tree Node ───────────────────────────────────────────────────
+
+interface FileTreeNodeProps {
+    item: FileItem;
+    depth: number;
+    projectId: Id<"projects">;
+    activeFileId: Id<"files"> | null;
+    selectedId: Id<"files"> | null;
+    onSelect: (item: FileItem) => void;
+    onContextAction: (action: 'new-file' | 'new-folder' | 'rename' | 'delete' | 'copy' | 'cut', item: FileItem, depth: number) => void;
+    creating: CreatingState | null;
+    onCreateSubmit: (name: string) => void;
+    onCreateCancel: () => void;
+    renaming: RenamingState | null;
+    onRenameSubmit: (name: string) => void;
+    onRenameCancel: () => void;
+}
