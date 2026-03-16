@@ -405,3 +405,4 @@ export async function getCommitLog(
         return [];
     }
 }
+

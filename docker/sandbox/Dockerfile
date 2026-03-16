@@ -78,6 +78,13 @@ ENV PATH=$PATH:/home/devuser/.cargo/bin
 RUN mkdir -p /workspace && chown devuser:devuser /workspace
 WORKDIR /workspace
 USER devuser
+RUN npm config set cache /home/devuser/.npm-cache && \
+    mkdir -p /home/devuser/.npm-cache && \
+    npm install --prefer-offline 2>/dev/null || true
+
+ENV NPM_CONFIG_CACHE=/home/devuser/.npm-cache
+ENV NPM_CONFIG_PREFIX=/home/devuser/.npm-global
+ENV PATH=$PATH:/home/devuser/.npm-global/bin
 
 # Verify key tools are available
 RUN node --version && \
