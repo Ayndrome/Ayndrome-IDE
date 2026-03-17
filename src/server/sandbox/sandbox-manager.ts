@@ -2,14 +2,14 @@ import Docker from 'dockerode';
 import fs from 'fs';
 import path from 'path';
 import { getWorkspacePath, touchWorkspace, registerWorkspace, WORKSPACES_BASE_DIR } from '../workspace/local-resgistry';
-
+import process from 'process';
 
 const SANDBOX_IMAGE = "web-ide-sandbox:latest";
 const CONTAINER_WORKSPACE = "/workspace";
 const IDLE_TIMEOUT_MS = 30 * 60 * 100;
 const EXEC_TIMEOUT_DEFAULT = 60_000;
 const MAX_RAM_BYTES = 512 * 1024 * 1024; // 512MB
-const MAX_CPU_CORES = 1_500_000_000; // 1.5 CPU Cores per container
+const MAX_CPU_NANO = 1_500_000_000; // 1.5 CPU Cores per container
 
 
 const docker = new Docker();
@@ -31,4 +31,183 @@ type SandboxEntry = {
 const liveSandboxes = new Map<string, SandboxEntry>();
 
 
+
+function containerName(workspaceId: string): string {
+    return `web-ide-${workspaceId}`;
+}
+
+
+
+// ── Get or create sandbox ─────────────────────────────────────────────────────
+// This is the main entry point called before every exec operation.
+// Idempotent — safe to call on every tool call.
+
+export async function getOrCreateSandbox(workspaceId: string, projectName = "workspace"): Promise<SandboxEntry> {
+
+
+    const live = liveSandboxes.get(workspaceId);
+
+    // 1. Return live entry if healthy
+    if (live) {
+        live.lastUsed = Date.now();
+
+        try {
+
+            const info = await live.container.inspect();
+            if (info.State.Running) return live;
+
+            console.log(`[Sandbox] Restarting stopped container: ${workspaceId}`);
+
+            await live.container.start();
+            live.lastUsed = Date.now();
+
+            return live;
+
+
+        } catch {
+
+            liveSandboxes.delete(workspaceId);
+
+        }
+
+
+
+    }
+
+    // 2. Check if container exists in Docker but not in our map
+    //    (happens after server restart)
+
+    try {
+
+        const existing = docker.getContainer(containerName(workspaceId));
+        const info = await existing.inspect();
+
+        if (info.State.Running) {
+
+            console.log(`[Sandbox] Re-attaching to existing container: ${workspaceId}`);
+
+            const entry: SandboxEntry = {
+                workspaceId,
+                containerId: info.Id,
+                containerName: info.Name.replace("/", ""),
+                container: existing,
+                hostPath: getWorkspacePath(workspaceId),
+                createdAt: new Date(info.Created).getTime(),
+                lastUsed: Date.now(),
+            };
+
+            liveSandboxes.set(workspaceId, entry);
+            return entry;
+
+        }
+
+    } catch (err: any) {
+        // Container doesn't exist → proceed to create
+    }
+
+    return await _createSandbox(workspaceId, projectName);
+
+
+
+
+}
+
+async function _createSandbox(workspaceId: string, projectName: string): Promise<SandboxEntry> {
+
+
+    const hostPath = getWorkspacePath(workspaceId);
+    if (!fs.existsSync(hostPath)) {
+        fs.mkdirSync(hostPath, { recursive: true });
+
+    }
+
+    try {
+
+        fs.chownSync(hostPath, process.getuid!(), process.getgid!());
+
+    } catch { // chown may fail if already correct - not critical 
+
+    }
+
+    const name = containerName(workspaceId);
+    console.log(`[Sandbox] Creating container: ${name}`);
+    console.log(`[Sandbox] Mounting: ${hostPath} → ${CONTAINER_WORKSPACE}`);
+
+
+    const container = await docker.createContainer({
+
+
+        Image: SANDBOX_IMAGE,
+        name,
+        Labels: {
+            "web-ide.workspace": workspaceId,
+            "web-ide.managed": "true",
+            "web-ide.projectName": projectName,
+        },
+
+        User: `${process.getuid!()}:${process.getgid!()}`,
+        WorkingDir: CONTAINER_WORKSPACE,
+        Tty: true,
+        OpenStdin: true,
+        AttachStdin: false,
+        AttachStderr: false,
+        AttachStdout: false,
+
+        Env: [
+            'HOME=/home/devuser',
+            'TERM=xterm-256color',
+            `WORKSPACE_ID=${workspaceId}`,
+
+            // npm cache to /tmp so it's never owned by wrong user
+
+            `NPM_CONFIG_CACHE=/tmp/npm-cache`,
+            `NPM_CONFIG_PREFIX=/tmp/npm-global`,
+            `PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin:/tmp/npm-global/bin:/usr/local/go/bin:/home/devuser/.cargo/bin`,
+            `GIT_CONFIG_NOSYSTEM=1`,
+            `GIT_AUTHOR_NAME=Web IDE`,
+            `GIT_AUTHOR_EMAIL=web-ide@localhost`,
+            `GIT_COMMITTER_NAME=Web IDE`,
+            `GIT_COMMITTER_EMAIL=web-ide@localhost`,
+        ],
+
+        HostConfig: {
+
+            Binds: [
+                `${hostPath}:${CONTAINER_WORKSPACE}`
+            ],
+
+            Memory: MAX_RAM_BYTES,
+            NanoCpus: MAX_CPU_NANO,
+
+
+            PidsLimit: 256,
+
+            NetworkMode: "Bridge",
+
+            RestartPolicy: { Name: "no" },
+
+            CapDrop: ["NET_ADMIN", "SYS_ADMIN", "SYS_PTRACE"],
+
+        },
+
+    });
+
+    (await container).start();
+
+
+    const info: SandboxEntry = {
+        workspaceId,
+        containerId: container.id,
+        containerName: name,
+        container,
+        hostPath,
+        createdAt: Date.now(),
+        lastUsed: Date.now(),
+    };
+
+    liveSandboxes.set(workspaceId, info);
+    console.log(`[Sandbox] Started: ${name} (${container.id.slice(0, 12)})`);
+    return info;
+
+}
 
