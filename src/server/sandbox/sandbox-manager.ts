@@ -368,3 +368,127 @@ export async function execInSandbox(workspaceId: string, command: string, option
 
 // ── Stop sandbox (sleep — container exists but not running) ───────────────────
 
+
+export async function stopSandbox(workspaceId: string): Promise<void> {
+
+    const entry = liveSandboxes.get(workspaceId);
+
+    if (!entry) return;;
+
+    try {
+
+        await entry.container.stop({ t: 5 });
+        console.log(`[Sandbox] Stopped (sleeping): ${workspaceId}`);
+
+
+
+    } catch (err: any) {
+
+        if (err?.statusCode !== 304) {
+            console.error(`[Sandbox] Stop error: ${workspaceId}`, err?.message);
+
+        }
+
+    }
+
+}
+
+
+export async function destroySandbox(workspaceId: string): Promise<void> {
+    const entry = liveSandboxes.get(workspaceId);
+
+    try {
+        const container = entry?.container
+            ?? docker.getContainer(containerName(workspaceId));
+
+        await container.stop({ t: 2 }).catch(() => { });
+        await container.remove({ force: true });
+        console.log(`[Sandbox] Destroyed: ${workspaceId}`);
+    } catch (err: any) {
+        if (err?.statusCode !== 404) {
+            console.error(`[Sandbox] Destroy error:`, err?.message);
+        }
+    }
+
+    liveSandboxes.delete(workspaceId);
+}
+
+// ── List all managed containers ───────────────────────────────────────────────
+
+export async function listSandboxes(): Promise<Array<{
+    workspaceId: string;
+    containerId: string;
+    running: boolean;
+    lastUsed: number;
+}>> {
+    const containers = await docker.listContainers({
+        all: true,
+        filters: JSON.stringify({ label: ["web-ide.managed=true"] }),
+    });
+
+    return containers.map(c => ({
+        workspaceId: c.Labels["web-ide.workspaceId"] ?? "unknown",
+        containerId: c.Id.slice(0, 12),
+        running: c.State === "running",
+        lastUsed: liveSandboxes.get(
+            c.Labels["web-ide.workspaceId"]
+        )?.lastUsed ?? 0,
+    }));
+}
+
+
+
+// ── Idle container cleanup ────────────────────────────────────────────────────
+// Stops containers that haven't been used for IDLE_TIMEOUT_MS.
+// Called on an interval from server.ts.
+// Containers are stopped not destroyed — they wake instantly on next use.
+
+export async function stopIdleContainers(): Promise<void> {
+    const now = Date.now();
+
+    for (const [workspaceId, entry] of liveSandboxes.entries()) {
+        if (now - entry.lastUsed < IDLE_TIMEOUT_MS) continue;
+
+        try {
+            const info = await entry.container.inspect();
+            if (!info.State.Running) continue;
+
+            console.log(`[Sandbox] Idle timeout — stopping: ${workspaceId}`);
+            await stopSandbox(workspaceId);
+        } catch {
+            liveSandboxes.delete(workspaceId);
+        }
+    }
+}
+
+// ── Verify Docker is accessible ───────────────────────────────────────────────
+// Called from server.ts on startup — fails fast with clear error message
+
+export async function verifyDocker(): Promise<void> {
+    try {
+        const info = await docker.info();
+        console.log(
+            `[Sandbox] Docker verified ✓\n` +
+            `  Version:     ${info.ServerVersion}\n` +
+            `  Containers:  ${info.Containers} total, ${info.ContainersRunning} running\n` +
+            `  Images:      ${info.Images}\n` +
+            `  Storage:     ${info.Driver}`
+        );
+
+        // Verify our image exists
+        try {
+            await docker.getImage(SANDBOX_IMAGE).inspect();
+            console.log(`[Sandbox] Image '${SANDBOX_IMAGE}' found ✓`);
+        } catch {
+            throw new Error(
+                `Docker image '${SANDBOX_IMAGE}' not found.\n` +
+                `Run: docker build -t ${SANDBOX_IMAGE} ./docker/sandbox`
+            );
+        }
+    } catch (err: any) {
+        throw new Error(
+            `[Sandbox] Cannot connect to Docker: ${err.message}\n` +
+            `Make sure Docker is running: sudo systemctl start docker`
+        );
+    }
+}
