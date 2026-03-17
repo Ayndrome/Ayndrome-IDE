@@ -211,3 +211,160 @@ async function _createSandbox(workspaceId: string, projectName: string): Promise
 
 }
 
+
+
+export type ExecResult = {
+    stdout: string;
+    stderr: string;
+    exitCode: number;
+    output: string;     // stdout + stderr interleaved (what user sees)
+    timedOut: boolean;
+}
+
+
+export async function execInSandbox(workspaceId: string, command: string, options: {
+    cwd?: string;
+    timeout?: number;
+    onStdout?: (data: string) => void;
+    onStderr?: (data: string) => void;
+    env?: string[];
+} = {}): Promise<ExecResult> {
+
+
+    const sandbox = await getOrCreateSandbox(workspaceId);
+    sandbox.lastUsed = Date.now();
+    touchWorkspace(workspaceId);
+
+    const { cwd = CONTAINER_WORKSPACE, timeout = EXEC_TIMEOUT_DEFAULT, onStdout, onStderr, env } = options;
+
+    let stdout = "";
+    let stderr = "";
+    let output = "";
+    let timedOut = false;
+
+    // create exec instance
+
+    const exec = await sandbox.container.exec({
+        Cmd: ["bash", "-c", command],
+        WorkingDir: cwd,
+        AttachStderr: true,
+        AttachStdout: true,
+        AttachStdin: false,
+        Tty: false,
+        Env: env,
+    });
+
+    return new Promise((resolve, reject) => {
+
+        const timer = setTimeout(() => {
+
+            timedOut = true;
+
+            resolve({
+                stdout,
+                stderr,
+                exitCode: -1,
+                output,
+                timedOut: true,
+            })
+
+        }, timeout);
+
+
+        exec.start({ hijack: true, stdin: false }, (err, stream) => {
+            if (err || !stream) {
+                clearTimeout(timer);
+                resolve({
+                    stdout: "",
+                    stderr: err?.message ?? "exec failed to start",
+                    output: err?.message ?? "exec failed to start",
+                    exitCode: 1,
+                    timedOut: false,
+                });
+                return;
+            }
+
+
+            // Docker multiplexes stdout and stderr on the same stream
+            // modem.demuxStream separates them into two writable streams
+
+            sandbox.container.modem.demuxStream(
+
+                stream,
+
+                {
+
+                    write: (chunk: Buffer) => {
+
+                        const str = chunk.toString("utf-8");
+                        stdout += str;
+                        output += str;
+                        onStdout?.(str);
+                    },
+
+                    end() { },
+
+
+                } as any,
+
+                {
+                    write: (chunk: Buffer) => {
+                        const str = chunk.toString("utf-8");
+                        stderr += str;
+                        output += str;
+                        onStderr?.(str);
+                    },
+                    end() { },
+                } as any,
+
+            )
+
+            stream.on("end", async () => {
+                clearTimeout(timer);
+                if (timedOut) return;
+
+                try {
+                    const inspected = await exec.inspect();
+                    resolve({
+                        stdout: stdout.trim(),
+                        stderr: stderr.trim(),
+                        output: output.trim(),
+                        exitCode: inspected.ExitCode ?? 0,
+                        timedOut: false,
+                    });
+                } catch {
+                    resolve({
+                        stdout: stdout.trim(),
+                        stderr: stderr.trim(),
+                        output: output.trim(),
+                        exitCode: 0,
+                        timedOut: false,
+                    });
+                }
+            });
+
+
+            stream.on("error", (streamErr) => {
+                clearTimeout(timer);
+                resolve({
+                    stdout,
+                    stderr: streamErr.message,
+                    output: output + streamErr.message,
+                    exitCode: 1,
+                    timedOut: false,
+                });
+            });
+        });
+
+
+    })
+
+
+
+
+
+}
+
+
+// ── Stop sandbox (sleep — container exists but not running) ───────────────────
+
