@@ -1,0 +1,23 @@
+{
+  "test-workspace-001": {
+    "workspaceId": "test-workspace-001",
+    "hostPath": "/home/shashank/web-ide-workspaces/test-workspace-001",
+    "projectName": "test-project",
+    "createdAt": 1773754062480,
+    "lastOpenedAt": 1773754920076
+  },
+  "test-ws-phase4": {
+    "workspaceId": "test-ws-phase4",
+    "hostPath": "/home/shashank/web-ide-workspaces/test-ws-phase4",
+    "projectName": "phase4-test",
+    "createdAt": 1773843758322,
+    "lastOpenedAt": 1773844099466
+  },
+  "j972ng8sj426yqp8yx2b8errjs81pmcn": {
+    "workspaceId": "j972ng8sj426yqp8yx2b8errjs81pmcn",
+    "hostPath": "/home/shashank/web-ide-workspaces/j972ng8sj426yqp8yx2b8errjs81pmcn",
+    "projectName": "workspace",
+    "createdAt": 1773846674509,
+    "lastOpenedAt": 1773846674525
+  }
+}

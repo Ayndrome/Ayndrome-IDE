@@ -2,7 +2,7 @@ import simpleGit, { SimpleGit, SimpleGitOptions } from "simple-git";
 import path from "path";
 import fs from 'fs';
 
-import { getWorkspacePath, registerWorkspace, touchWorkspace, WORKSPACES_BASE_DIR } from './local-resgistry'
+import { getWorkspacePath, registerWorkspace, touchWorkspace, WORKSPACES_BASE_DIR } from './local-registry'
 
 
 import type { GitOperationResult, GitStatus } from "@/src/app/features/ide/extensions/chat/types/types";

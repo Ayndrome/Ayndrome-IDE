@@ -5,7 +5,7 @@
 // commit + push before the container idles.
 
 import { autoCommit, pushToRemote, getGitStatus } from "./git-manager";
-import { listWorkspaces } from "./local-resgistry";
+import { listWorkspaces } from "./local-registry";
 
 const AUTO_SAVE_INTERVAL_MS = 60_000;  // 1 minute
 const PUSH_INTERVAL_MS = 300_000; // 5 minutes

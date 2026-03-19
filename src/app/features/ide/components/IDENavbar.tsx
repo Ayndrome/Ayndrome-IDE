@@ -10,7 +10,7 @@ import { Badge } from "@/components/ui/badge";
 import { UserButton } from "@clerk/nextjs";
 import {
     PlayIcon, SquareIcon, Settings2Icon, GitBranchIcon,
-    Share2Icon, ChevronLeft, ZapIcon, WifiIcon,
+    Share2Icon, ChevronLeft, ZapIcon, WifiIcon, TerminalIcon,
 } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useIDEStore } from "@/src/store/ide-store";
@@ -29,7 +29,7 @@ interface IDENavbarProps {
 
 export const IDENavbar = ({ project }: IDENavbarProps) => {
     const router = useRouter();
-    const { viewMode, setViewMode, isRunning, handleRun, handleStop } = useIDEStore();
+    const { viewMode, setViewMode, isRunning, handleRun, handleStop, toggleTerminal, bottomPanel } = useIDEStore();
 
     return (
         <header
@@ -126,6 +126,26 @@ export const IDENavbar = ({ project }: IDENavbarProps) => {
                         </Button>
                     </TooltipTrigger>
                     <TooltipContent side="bottom">Project settings</TooltipContent>
+                </Tooltip>
+
+                <Tooltip>
+                    <TooltipTrigger asChild>
+                        <Button
+                            variant="ghost"
+                            size="icon"
+                            className="size-7"
+                            onClick={toggleTerminal}
+                            style={{
+                                color: bottomPanel === "terminal" ? "#58a6ff" : "#8b949e",
+                                backgroundColor: bottomPanel === "terminal" ? "#1f3a5f" : "transparent",
+                            }}
+                        >
+                            <TerminalIcon className="size-3.5" />
+                        </Button>
+                    </TooltipTrigger>
+                    <TooltipContent side="bottom">
+                        {bottomPanel === "terminal" ? "Hide terminal" : "Show terminal"}
+                    </TooltipContent>
                 </Tooltip>
 
                 <div className="w-px h-4" style={{ backgroundColor: '#30363d' }} />
