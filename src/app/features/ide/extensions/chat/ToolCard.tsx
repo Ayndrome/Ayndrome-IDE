@@ -3,7 +3,7 @@
 // Design: glass card with left accent border that changes color by state.
 // States: invalid_params | tool_request | running_now | tool_error |
 //         success | rejected | interrupted_tool
-
+'use client'
 import React, { useState, useEffect, useRef } from "react";
 import { cn } from "@/lib/utils";
 import {
@@ -14,7 +14,7 @@ import {
 } from "lucide-react";
 import { WebToolName } from "./types/types";
 import { StatusRing } from "./StatusRing";
-
+import { FileIcon, FolderIcon, DefaultFolderOpenedIcon } from "@react-symbols/icons/utils";
 // ── State-derived visual tokens ───────────────────────────────────────────────
 
 type ToolState =
@@ -34,8 +34,11 @@ const STATE_TOKENS: Record<ToolState, {
 }> = {
     pending: { accent: "border-amber-500/40 bg-amber-500/3", icon: <Clock size={11} className="text-amber-400" />, ring: "awaiting" },
     running: { accent: "border-sky-500/40 bg-sky-500/3", icon: null, ring: "tool" },
-    success: { accent: "border-emerald-500/25 bg-emerald-500/3", icon: <CheckCircle2 size={11} className="text-emerald-400" />, ring: "idle" },
-    error: { accent: "border-red-500/35 bg-red-500/3", icon: <AlertTriangle size={11} className="text-red-400" />, ring: "error" },
+    success: {
+        accent: "border-foreground/10 bg-foreground/5",
+        icon: <CheckCircle2 color="white" size={11} className="text-white" />,
+        ring: "idle"
+    }, error: { accent: "border-red-500/35 bg-red-500/3", icon: <AlertTriangle size={11} className="text-red-400" />, ring: "error" },
     rejected: { accent: "border-zinc-500/25 bg-zinc-500/3", icon: <Ban size={11} className="text-zinc-500" />, ring: "idle" },
     invalid: { accent: "border-red-500/35 bg-red-500/3", icon: <AlertTriangle size={11} className="text-red-400" />, ring: "error" },
     interrupted: { accent: "border-zinc-500/25 bg-zinc-500/3", icon: <Ban size={11} className="text-zinc-500" />, ring: "idle" },
@@ -353,6 +356,7 @@ export const ToolCard: React.FC<ToolCardProps> = ({
                     />
                 )}
 
+
                 {/* Tool icon */}
                 <span className="text-muted-foreground/50 flex-shrink-0">
                     {meta?.icon ?? <FileText size={11} />}
@@ -370,8 +374,11 @@ export const ToolCard: React.FC<ToolCardProps> = ({
                     )}>
                         {verb}
                     </span>
-                    <span className="font-mono text-muted-foreground/60 truncate text-[11px]">
-                        {label}
+                    <span className="font-mono text-white truncate text-[11px]">
+                        <div className="flex items-center gap-1.5">
+                            <FileIcon fileName={label} autoAssign className="size-4" />
+                            {label}
+                        </div>
                     </span>
                     {mcpServerName && (
                         <span className="text-[10px] text-muted-foreground/30 flex-shrink-0 font-mono">

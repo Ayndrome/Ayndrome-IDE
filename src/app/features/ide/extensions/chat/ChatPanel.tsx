@@ -16,7 +16,7 @@ import { ChatInput } from "./ChatInput";
 import { PastThreads } from "./PastThreads";
 import { StatusRing, StatusLabel } from "./StatusRing";
 import { Plus, ChevronLeft, Sparkles } from "lucide-react";
-
+import { ChangedFilesBar } from "./ChangedFilesBar";
 // Forward-declare — Part 2 will fill these in
 // (importing here so the wiring is complete)
 import { ChatMessages } from "./ChatMessages";
@@ -249,6 +249,7 @@ const LandingPage: React.FC<{
 
             {/* Input */}
             <div className="px-3 pb-3">
+                <ChangedFilesBar />
                 <ChatInput
                     threadId={threadId}
                     isStreaming={isStreaming}
@@ -303,7 +304,7 @@ export const ChatPanel: React.FC<{ className?: string }> = ({ className }) => {
     return (
         <div className={cn(
             "flex flex-col h-full w-full overflow-hidden",
-            "bg-background text-foreground",
+            "bg-[#181818] text-foreground",
             className
         )}>
             {hasMessages ? (

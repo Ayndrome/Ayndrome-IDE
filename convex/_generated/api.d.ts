@@ -12,6 +12,7 @@ import type * as auth from "../auth.js";
 import type * as chatThreads from "../chatThreads.js";
 import type * as files from "../files.js";
 import type * as project from "../project.js";
+import type * as workspaces from "../workspaces.js";
 
 import type {
   ApiFromModules,
@@ -24,6 +25,7 @@ declare const fullApi: ApiFromModules<{
   chatThreads: typeof chatThreads;
   files: typeof files;
   project: typeof project;
+  workspaces: typeof workspaces;
 }>;
 
 /**

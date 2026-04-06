@@ -26,6 +26,7 @@ import {
     Loader2Icon,
     WifiOffIcon,
 } from "lucide-react";
+import { listSessions, attachUserToSession } from "@/src/server/sandbox/persistent-terminal-manager";
 
 // ── xterm imports (dynamic — avoids SSR issues) ───────────────────────────────
 // xterm.js uses browser APIs so must never run on server.
@@ -57,9 +58,9 @@ const WS_BASE = typeof window !== "undefined"
 const PING_INTERVAL = 30_000;   // 30s keepalive
 const MAX_TABS = 5;
 
-// xterm.js theme matching your IDE's GitHub dark aesthetic
+
 const XTERM_THEME = {
-    background: "#0d1117",
+    background: "#1e1f22",
     foreground: "#e6edf3",
     cursor: "#58a6ff",
     cursorAccent: "#0d1117",
@@ -101,6 +102,7 @@ const TerminalInstance: React.FC<TerminalInstanceProps> = ({
     onError,
     onClose,
 }) => {
+
     const containerRef = useRef<HTMLDivElement>(null);
 
     useEffect(() => {
@@ -120,7 +122,7 @@ const TerminalInstance: React.FC<TerminalInstanceProps> = ({
             const { WebLinksAddon } = await import("@xterm/addon-web-links");
 
             // Dynamically import xterm CSS once
-            // await import("@xterm/xterm/css/xterm.css");
+            await import("@xterm/xterm/css/xterm.css");
 
             term = new Terminal({
                 theme: XTERM_THEME,
@@ -258,6 +260,8 @@ const TerminalInstance: React.FC<TerminalInstanceProps> = ({
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [session.id]);
 
+
+
     // ── Focus when tab becomes active ─────────────────────────────────────────
     useEffect(() => {
         if (isActive && session.term) {
@@ -350,6 +354,48 @@ export const TerminalPanel: React.FC<TerminalPanelProps> = ({
         setActiveId(first.id);
     }, [workspaceId, sessions.length, createSession]);
 
+
+    useEffect(() => {
+        if (!workspaceId) return;
+
+        const sync = async () => {
+            try {
+                const res = await fetch(
+                    `/api/terminal/persistent?action=list&workspaceId=${workspaceId}`
+                );
+                if (!res.ok) return;
+                const { sessions: persistentSessions } = await res.json();
+
+                setSessions(prev => {
+                    const existingIds = new Set(prev.map(s => s.id));
+                    const toAdd = persistentSessions
+                        .filter((ps: any) =>
+                            !existingIds.has(`persistent:${ps.name}`) &&
+                            ps.status !== "exited"
+                        )
+                        .map((ps: any) => ({
+                            id: `persistent:${ps.name}`,
+                            label: ps.name,
+                            status: ps.status === "ready" ? "ready" : "connecting",
+                            term: null,
+                            fitAddon: null,
+                            ws: null,
+                            pingTimer: null,
+                            persistent: true,   // mark as agent-managed
+                            sessionName: ps.name,
+                        }));
+
+                    return toAdd.length > 0 ? [...prev, ...toAdd] : prev;
+                });
+            } catch { }
+        };
+
+        sync();
+        const interval = setInterval(sync, 2000);
+        return () => clearInterval(interval);
+    }, [workspaceId]);
+
+
     // ── Add new tab ────────────────────────────────────────────────────────────
 
     const handleAddTab = useCallback(() => {
@@ -426,7 +472,7 @@ export const TerminalPanel: React.FC<TerminalPanelProps> = ({
             <div
                 className="flex items-center shrink-0 overflow-x-auto"
                 style={{
-                    backgroundColor: "#161b22",
+                    backgroundColor: "#1e1f22",
                     borderBottom: "1px solid #30363d",
                     minHeight: "32px",
                 }}

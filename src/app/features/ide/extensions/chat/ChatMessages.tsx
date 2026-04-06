@@ -11,6 +11,8 @@ import { useChatStore } from "@/src/store/chat-thread-store";
 import { ChatMessage } from "./types/types";
 import { ChatBubble } from "./ChatBubble";
 import { useScrollToBottom } from "./chat-hook";
+import { PlanBubble } from "./plan-bubble";
+import type { AgentPlan } from "./types/plan-types";
 
 // ── Fade-in animation injection ───────────────────────────────────────────────
 
@@ -87,10 +89,17 @@ export const ChatMessages: React.FC<{ threadId: string }> = ({ threadId }) => {
                 "px-4 py-5",
                 // Custom scrollbar
                 "scrollbar-thin scrollbar-track-transparent",
-                "scrollbar-thumb-border/30 hover:scrollbar-thumb-border/50"
+                "scrollbar-thumb-border/30 hover:scrollbar-thumb-border/50",
             )}
         >
             {allMessages.map((msg, i) => {
+                if ((msg as any).role === "plan") {
+                    return (
+                        <div key={i} className="px-4 py-2">
+                            <PlanBubble plan={msg as unknown as AgentPlan} />
+                        </div>
+                    );
+                }
                 const isLiveMessage = liveMessage !== null && i === totalCount - 1;
                 const isCommitted = !isLiveMessage;
 

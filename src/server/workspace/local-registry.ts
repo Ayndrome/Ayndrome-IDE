@@ -49,7 +49,10 @@ function writeRegistry(registry: Registry): void {
 export function getWorkspacePath(workspaceId: string): string {
 
     const registry = readRegistry();
+    // console.log(registry);
+    // console.log(workspaceId);
     const entry = registry[workspaceId];
+    // console.log(entry);
 
     if (!entry) {
         throw new Error(
@@ -66,6 +69,7 @@ export function getWorkspacePath(workspaceId: string): string {
 // Get workspace path safely — returns null if not found
 export function getWorkspacePathSafe(workspaceId: string): string | null {
     try {
+        // console.log("trying...");
         return getWorkspacePath(workspaceId);
     } catch {
         return null;

@@ -63,6 +63,9 @@ interface IDEState {
     // ── Run state ──────────────────────────────────────────────────────
     isRunning: boolean;
 
+    showSessionSidebar: boolean;
+
+
     // ── Actions ────────────────────────────────────────────────────────
     setProject: (id: Id<"projects">, name: string) => void;
     setViewMode: (mode: ViewMode) => void;
@@ -73,6 +76,7 @@ interface IDEState {
     handleRun: () => void;
     handleStop: () => void;
     reset: () => void;
+    toggleSessionSidebar: () => void;
 }
 
 export const useIDEStore = create<IDEState>((set, get) => ({
@@ -83,6 +87,7 @@ export const useIDEStore = create<IDEState>((set, get) => ({
     bottomPanel: "none",
     bottomPanelHeight: 240,
     isRunning: false,
+    showSessionSidebar: false,
 
     setProject: (id, name) => set({
         projectId: id,
@@ -111,5 +116,11 @@ export const useIDEStore = create<IDEState>((set, get) => ({
         bottomPanel: "none",
         bottomPanelHeight: 240,
         isRunning: false,
+        showSessionSidebar: false,
     }),
+
+    toggleSessionSidebar: () => {
+        const { showSessionSidebar } = get();
+        set({ showSessionSidebar: !showSessionSidebar });
+    },
 }));

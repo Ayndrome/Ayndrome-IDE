@@ -101,7 +101,7 @@ const EditForm: React.FC<EditFormProps> = ({
 
     return (
         <div className={cn(
-            "w-full rounded-xl border border-border/60",
+            "max-w-[88%] rounded-xl border border-border/60",
             "bg-card/80 backdrop-blur-sm shadow-sm",
             "overflow-hidden"
         )}>
@@ -112,7 +112,7 @@ const EditForm: React.FC<EditFormProps> = ({
                 onKeyDown={handleKeyDown}
                 rows={1}
                 className={cn(
-                    "w-full resize-none bg-transparent px-3 pt-3 pb-2",
+                    "max-w-[88%] resize-none bg-transparent px-3 pt-3 pb-2",
                     "text-[13px] text-foreground placeholder:text-muted-foreground/40",
                     "outline-none border-none ring-0 leading-relaxed",
                     "min-h-[52px] max-h-[280px]"
@@ -152,7 +152,89 @@ const EditForm: React.FC<EditFormProps> = ({
     );
 };
 
+// // ── UserBubble (main export) ──────────────────────────────────────────────────
+
+// interface UserBubbleProps {
+//     message: ChatMessage & { role: "user" };
+//     messageIdx: number;
+//     threadId: string;
+//     isGhosted: boolean;
+// }
+
+// export const UserBubble: React.FC<UserBubbleProps> = ({
+//     message,
+//     messageIdx,
+//     threadId,
+//     isGhosted,
+// }) => {
+//     const [editing, setEditing] = useState(false);
+//     const [hovered, setHovered] = useState(false);
+
+//     const attachments = message.attachments ?? message.state?.stagingSelections ?? [];
+
+//     if (editing) {
+//         return (
+//             <div className="w-full max-w-full ml-auto">
+//                 <EditForm
+//                     initialValue={message.displayContent}
+//                     threadId={threadId}
+//                     messageIdx={messageIdx}
+//                     onClose={() => setEditing(false)}
+//                 />
+//             </div>
+//         );
+//     }
+
+//     return (
+//         <div
+//             className={cn(
+//                 "flex flex-col items-end",
+//                 isGhosted && "opacity-40 pointer-events-none"
+//             )}
+//             onMouseEnter={() => setHovered(true)}
+//             onMouseLeave={() => setHovered(false)}
+//         >
+//             {/* Attachment chips */}
+//             <AttachmentChips attachments={attachments} />
+
+//             {/* Bubble + edit button row */}
+//             <div className="flex items-end gap-1.5 w-full">
+//                 {/* Edit button — appears on hover */}
+//                 <button
+//                     type="button"
+//                     onClick={() => setEditing(true)}
+//                     className={cn(
+//                         "mb-0.5 p-1.5 rounded-lg flex-shrink-0",
+//                         "text-muted-foreground/40 hover:text-muted-foreground",
+//                         "hover:bg-muted/50 transition-all duration-150",
+//                         hovered ? "opacity-100" : "opacity-0"
+//                     )}
+//                     title="Edit message"
+//                 >
+//                     <Pencil size={11} />
+//                 </button>
+
+//                 {/* Message bubble */}
+//                 <div
+//                     className={cn(
+//                         "px-3.5 py-2.5 rounded-2xl rounded-br-sm",
+//                         "bg-muted/50 border border-border/25",
+//                         "text-[13px] text-foreground leading-relaxed",
+//                         "whitespace-pre-wrap break-words",
+//                         "cursor-pointer hover:bg-muted/70 transition-colors duration-150",
+//                         "max-w-[88%]"
+//                     )}
+//                     onClick={() => setEditing(true)}
+//                     title="Click to edit"
+//                 >
+//                     {message.displayContent}
+//                 </div>
+//             </div>
+//         </div>
+//     );
+// };
 // ── UserBubble (main export) ──────────────────────────────────────────────────
+
 
 interface UserBubbleProps {
     message: ChatMessage & { role: "user" };
@@ -169,12 +251,25 @@ export const UserBubble: React.FC<UserBubbleProps> = ({
 }) => {
     const [editing, setEditing] = useState(false);
     const [hovered, setHovered] = useState(false);
+    const [expanded, setExpanded] = useState(false);
 
     const attachments = message.attachments ?? message.state?.stagingSelections ?? [];
 
+    // Configurable character limit
+    const CHAR_LIMIT = 400;
+    const content = message.displayContent || "";
+    const isLong = content.length > CHAR_LIMIT;
+
+    // Slice up to limit, and use regex to avoid cutting a word in half
+    const truncatedContent = isLong
+        ? content.slice(0, CHAR_LIMIT).replace(/\s+\S*$/, "") + "..."
+        : content;
+
+    const textToShow = isLong && !expanded ? truncatedContent : content;
+
     if (editing) {
         return (
-            <div className="w-full max-w-[88%] ml-auto">
+            <div className="w-full max-w-full ml-auto">
                 <EditForm
                     initialValue={message.displayContent}
                     threadId={threadId}
@@ -218,16 +313,34 @@ export const UserBubble: React.FC<UserBubbleProps> = ({
                 <div
                     className={cn(
                         "px-3.5 py-2.5 rounded-2xl rounded-br-sm",
-                        "bg-muted/60 border border-border/25",
+                        "bg-muted/50 border border-border/25",
                         "text-[13px] text-foreground leading-relaxed",
                         "whitespace-pre-wrap break-words",
                         "cursor-pointer hover:bg-muted/70 transition-colors duration-150",
-                        "max-w-full"
+                        "max-w-[88%]"
                     )}
                     onClick={() => setEditing(true)}
                     title="Click to edit"
                 >
-                    {message.displayContent}
+                    {textToShow}
+
+                    {/* Expand / Collapse Button */}
+                    {isLong && (
+                        <button
+                            type="button"
+                            onClick={(e) => {
+                                // Prevent triggering the edit mode when expanding/collapsing
+                                e.stopPropagation();
+                                setExpanded(!expanded);
+                            }}
+                            className={cn(
+                                "block mt-1.5 text-[11px] font-medium transition-colors",
+                                "text-muted-foreground/60 hover:text-foreground/80"
+                            )}
+                        >
+                            {expanded ? "Show less" : "Show more"}
+                        </button>
+                    )}
                 </div>
             </div>
         </div>

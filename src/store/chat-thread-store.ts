@@ -841,6 +841,7 @@ import {
     initChatStorage,
     setAgentWorkspace,
 } from "../app/features/ide/extensions/chat/ChatThreadService";
+import { AgentPlan } from "../app/features/ide/extensions/chat/types/plan-types";
 
 // ── Store shape ───────────────────────────────────────────────────────────────
 
@@ -861,6 +862,11 @@ export type ChatStore = {
     chatMode: "normal" | "gather" | "agent";
     autoApproveEdits: boolean;
     autoApproveTerminal: boolean;
+
+    // ── Plan Mode ──────────────────────────────────────────────────────────────
+    planMode: boolean;
+    currentPlanByThread: Record<string, AgentPlan | undefined>;
+
 
     // ── Actions ────────────────────────────────────────────────────────────────
 
@@ -917,6 +923,11 @@ export type ChatStore = {
     _getCurrentThread: () => ChatThread | undefined;
     _setThreadState: (threadId: string, partial: Partial<ChatThread> | { messages?: ChatMessage[]; state?: ChatThread["state"] }) => void;
     _setMessageState: (threadId: string, messageIdx: number, partial: Partial<{ stagingSelections: StagingSelection[]; isBeingEdited: boolean }>) => void;
+
+    // ── Plan Mode Actions ──────────────────────────────────────────────────────────────
+    setPlanMode: (planMode: boolean) => void;
+    _addPlan: (threadId: string, Plan: AgentPlan) => void;
+    _updatePlan: (threadId: string, Plan: AgentPlan) => void;
 };
 
 // ── Store ─────────────────────────────────────────────────────────────────────
@@ -931,6 +942,8 @@ export const useChatStore = create<ChatStore>()(
         chatMode: "agent",
         autoApproveEdits: false,
         autoApproveTerminal: false,
+        planMode: false,
+        currentPlanByThread: {},
 
         // ── Initialize ────────────────────────────────────────────────────────
         // Called from IDEWorkspace on mount with the Convex client + workspaceId.
@@ -1397,10 +1410,15 @@ export const useChatStore = create<ChatStore>()(
 
         setChatMode: (mode) => set({ chatMode: mode }),
         setAutoApprove: (type, value) => {
-            if (type === "edits") set({ autoApproveEdits: value });
-            else set({ autoApproveTerminal: value });
+            if (type === "edits") {
+                set({ autoApproveEdits: value });
+                // Sync to ChatThreadService
+                import("../app/features/ide/extensions/chat/ChatThreadService")
+                    .then(({ setAutoApproveEdits }) => setAutoApproveEdits(value));
+            } else {
+                set({ autoApproveTerminal: value });
+            }
         },
-
         // ── Internals ──────────────────────────────────────────────────────────
 
         _setStreamState: (threadId, state) => {
@@ -1501,6 +1519,43 @@ export const useChatStore = create<ChatStore>()(
                 return { threads: { ...s.threads, [threadId]: updated } };
             });
         },
+
+
+        setPlanMode: (on) => set({ planMode: on }),
+
+        _addPlan: (threadId, plan) => {
+            set(s => ({
+                currentPlanByThread: {
+                    ...s.currentPlanByThread,
+                    [threadId]: plan,
+                },
+            }));
+            // Also add plan as a message in the thread
+            get()._addMessageToThread(threadId, plan as any);
+        },
+
+        _updatePlan: (threadId, plan) => {
+            set(s => ({
+                currentPlanByThread: {
+                    ...s.currentPlanByThread,
+                    [threadId]: plan,
+                },
+            }));
+            // Update the plan message in the thread
+            set(s => {
+                const thread = s.threads[threadId];
+                if (!thread) return s;
+                const msgs = thread.messages.map(m =>
+                    (m as any).role === "plan" && (m as any).id === plan.id
+                        ? plan
+                        : m
+                );
+                const updated = { ...thread, messages: msgs as any };
+                saveThread(updated, s.workspaceId);
+                return { threads: { ...s.threads, [threadId]: updated } };
+            });
+        },
+
     }))
 );
 
@@ -1513,7 +1568,36 @@ function _buildAgentCallbacks(
     autoApproveEdits: boolean,
     autoApproveTerminal: boolean,
     workspaceId: string,
+
 ): AgentCallbacks {
+    // return {
+    //     onStreamStateChange: (state) => get()._setStreamState(threadId, state),
+    //     onAddMessage: (msg) => get()._addMessageToThread(threadId, msg),
+    //     onReplaceLastMessage: (msg) => get()._replaceLastMessage(threadId, msg),
+    //     onAddCheckpoint: (cp) => get()._addCheckpoint(threadId, cp),
+    //     getMessages: () => get().threads[threadId]?.messages ?? [],
+    //     onNotify: ({ message, type }) => {
+    //         if (type === "error") toast.error(message);
+    //         else toast.success(message);
+    //     },
+    //     chatMode,
+    //     autoApproveEdits,
+    //     autoApproveTerminal,
+    // };
+
+    // Import editor store to get active file context
+    // Dynamic import avoids circular dependency
+    let activeFilePath: string | null = null;
+    let openFilePaths: string[] = [];
+
+    try {
+        // Read from editor store synchronously
+        const { useEditorStore } = require("../store/editor-store");
+        const editorState = useEditorStore.getState();
+        activeFilePath = editorState.activeFilePath ?? null;
+        openFilePaths = editorState.tabs.map((t: any) => t.relativePath);
+    } catch { /* best effort */ }
+
     return {
         onStreamStateChange: (state) => get()._setStreamState(threadId, state),
         onAddMessage: (msg) => get()._addMessageToThread(threadId, msg),
@@ -1527,6 +1611,14 @@ function _buildAgentCallbacks(
         chatMode,
         autoApproveEdits,
         autoApproveTerminal,
+        // ── Phase 6: workspace context fields ──────────────────────────────
+        activeFilePath,
+        openFilePaths,
+        workspaceName: get().threads[threadId] ? "workspace" : undefined,
+        planMode: get().planMode,
+        onAddPlan: (plan) => get()._addPlan(threadId, plan),
+        onUpdatePlan: (plan) => get()._updatePlan(threadId, plan),
+        getCurrentPlan: () => get().currentPlanByThread[threadId] ?? null,
     };
 }
 
@@ -1569,3 +1661,4 @@ function _buildAttachmentSummary(selections: StagingSelection[]): string {
         .filter(Boolean)
         .join("\n");
 }
+

@@ -1,23 +1,37 @@
 {
-  "test-workspace-001": {
-    "workspaceId": "test-workspace-001",
-    "hostPath": "/home/shashank/web-ide-workspaces/test-workspace-001",
-    "projectName": "test-project",
-    "createdAt": 1773754062480,
-    "lastOpenedAt": 1773754920076
+  "jx7bbw9042b8c9tex7qh8wsjj98380w3": {
+    "workspaceId": "jx7bbw9042b8c9tex7qh8wsjj98380w3",
+    "hostPath": "/home/shashank/web-ide-workspaces/jx7bbw9042b8c9tex7qh8wsjj98380w3",
+    "projectName": "asf",
+    "createdAt": 1773989236498,
+    "lastOpenedAt": 1774266920092
   },
-  "test-ws-phase4": {
-    "workspaceId": "test-ws-phase4",
-    "hostPath": "/home/shashank/web-ide-workspaces/test-ws-phase4",
-    "projectName": "phase4-test",
-    "createdAt": 1773843758322,
-    "lastOpenedAt": 1773844099466
+  "jx7a19z8c2wb73hj8ymtk0a7t5838nbs": {
+    "workspaceId": "jx7a19z8c2wb73hj8ymtk0a7t5838nbs",
+    "hostPath": "/home/shashank/web-ide-workspaces/jx7a19z8c2wb73hj8ymtk0a7t5838nbs",
+    "projectName": "awesomee",
+    "createdAt": 1774014248100,
+    "lastOpenedAt": 1774290870348
   },
-  "j972ng8sj426yqp8yx2b8errjs81pmcn": {
-    "workspaceId": "j972ng8sj426yqp8yx2b8errjs81pmcn",
-    "hostPath": "/home/shashank/web-ide-workspaces/j972ng8sj426yqp8yx2b8errjs81pmcn",
-    "projectName": "workspace",
-    "createdAt": 1773846674509,
-    "lastOpenedAt": 1773846674525
+  "jx779p8ne4e2y0yx61x5fedwkn83ezfs": {
+    "workspaceId": "jx779p8ne4e2y0yx61x5fedwkn83ezfs",
+    "hostPath": "/home/shashank/web-ide-workspaces/jx779p8ne4e2y0yx61x5fedwkn83ezfs",
+    "projectName": "LSpTrail",
+    "createdAt": 1774292760300,
+    "lastOpenedAt": 1774294264779
+  },
+  "jx75gm79mre6jrt9tkgrqss5mn83hhjh": {
+    "workspaceId": "jx75gm79mre6jrt9tkgrqss5mn83hhjh",
+    "hostPath": "/home/shashank/web-ide-workspaces/jx75gm79mre6jrt9tkgrqss5mn83hhjh",
+    "projectName": "trial",
+    "createdAt": 1774351481237,
+    "lastOpenedAt": 1774551495317
+  },
+  "jx7989cer1nnx2e7c1z26d9nn9849bh5": {
+    "workspaceId": "jx7989cer1nnx2e7c1z26d9nn9849bh5",
+    "hostPath": "/home/shashank/web-ide-workspaces/jx7989cer1nnx2e7c1z26d9nn9849bh5",
+    "projectName": "reviewer",
+    "createdAt": 1775373976706,
+    "lastOpenedAt": 1775503566270
   }
 }

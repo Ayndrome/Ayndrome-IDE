@@ -21,7 +21,7 @@ export const create = mutation({
       name: args.name,
       userId: profile.subject,
       updatedAt: Date.now(),
-      importStatus: args.importStatus,
+      // importStatus: args.importStatus,
     });
   },
 });

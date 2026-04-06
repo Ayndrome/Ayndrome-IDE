@@ -94,60 +94,81 @@
    Accent:       #388bfd  (primary blue - links, focus rings)
    Danger:       #f85149
    ─────────────────────────────────────────────────────────────────────── */
-
 .dark {
   --radius: 0.375rem;
 
-  /* ── Core ── */
-  --background:         #0d1117;
-  --foreground:         #e6edf3;
+  /* ── Core surfaces ── */
+  --background: #141414;
+  /* main bg — deepest surface */
+  --foreground: #bcbec4;
+  /* primary text */
 
-  --card:               #161b22;
-  --card-foreground:    #e6edf3;
+  --card: #2b2d30;
+  /* panels, chat bg */
+  --card-foreground: #bcbec4;
 
-  --popover:            #1c2128;
-  --popover-foreground: #e6edf3;
+  --popover: #2b2d30;
+  --popover-foreground: #bcbec4;
 
-  /* ── Primary — GitHub blue ── */
-  --primary:            #388bfd;
-  --primary-foreground: #ffffff;
+  /* ── Primary — muted sage green ── */
+  --primary: #59a869;
+  --primary-foreground: #0d1f16;
 
   /* ── Secondary ── */
-  --secondary:          #21262d;
-  --secondary-foreground: #e6edf3;
+  --secondary: #313438;
+  --secondary-foreground: #bcbec4;
 
   /* ── Muted ── */
-  --muted:              #161b22;
-  --muted-foreground:   #8b949e;
+  --muted: #313438;
+  --muted-foreground: #8a8d94;
 
   /* ── Accent ── */
-  --accent:             #21262d;
-  --accent-foreground:  #e6edf3;
+  --accent: #3c3f41;
+  --accent-foreground: #bcbec4;
 
   /* ── Destructive ── */
-  --destructive:        #f85149;
+  --destructive: #c75450;
 
   /* ── Borders & inputs ── */
-  --border:             #30363d;
-  --input:              #21262d;
-  --ring:               #388bfd60;
+  --border: #3c3f41;
+  --input: #2b2d30;
+  --ring: #59a86940;
 
   /* ── Sidebar / file explorer ── */
-  --sidebar:            #010409;
-  --sidebar-foreground: #e6edf3;
-  --sidebar-primary:    #388bfd;
-  --sidebar-primary-foreground: #ffffff;
-  --sidebar-accent:     #161b22;
-  --sidebar-accent-foreground: #e6edf3;
-  --sidebar-border:     #30363d;
-  --sidebar-ring:       #388bfd60;
+  --sidebar: #1e1f22;
+  --sidebar-foreground: #bcbec4;
+  --sidebar-primary: #59a869;
+  --sidebar-primary-foreground: #0d1f16;
+  --sidebar-accent: #2b2d30;
+  --sidebar-accent-foreground: #bcbec4;
+  --sidebar-border: #3c3f41;
+  --sidebar-ring: #59a86940;
 
   /* ── Charts ── */
-  --chart-1: #388bfd;
-  --chart-2: #3fb950;
-  --chart-3: #d2a8ff;
-  --chart-4: #ffa657;
-  --chart-5: #f85149;
+  --chart-1: #59a869;
+  --chart-2: #7b8cde;
+  --chart-3: #c09a4e;
+  --chart-4: #c75450;
+  --chart-5: #4ec9b0;
+}
+
+
+.cm-scroller {
+  overflow: "auto"
+}
+
+.cm-scroller::-webkit-scrollbar {
+  width: "8px";
+  height: "8px"
+}
+
+.cm-scroller::-webkit-scrollbar-track {
+  background: "#141414"
+}
+
+.cm-scroller::-webkit-scrollbar-thumb {
+  background: "#141414";
+  border-radius: "4px";
 }
 
 @layer base {
@@ -155,6 +176,7 @@
     @apply border-border outline-ring/50;
     @apply border-border outline-ring/50;
   }
+
   body {
     @apply bg-background text-foreground;
     @apply bg-background text-foreground;

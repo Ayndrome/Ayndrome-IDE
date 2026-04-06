@@ -18,16 +18,84 @@ import {
 
 // ── Code block with copy ──────────────────────────────────────────────────────
 
+// const CodeBlock: React.FC<{
+//     inline?: boolean;
+//     className?: string;
+//     children?: React.ReactNode;
+// }> = ({ inline, className, children }) => {
+//     const [copied, setCopied] = useState(false);
+//     const code = String(children ?? "").replace(/\n$/, "");
+//     const lang = (className ?? "").replace("language-", "") || "text";
+
+//     if (inline) {
+//         return (
+//             <code className={cn(
+//                 "px-1.5 py-0.5 rounded-md text-[11.5px] font-mono",
+//                 "bg-muted/50 text-foreground/80 border border-border/25"
+//             )}>
+//                 {code}
+//             </code>
+//         );
+//     }
+
+//     const handleCopy = () => {
+//         navigator.clipboard.writeText(code).then(() => {
+//             setCopied(true);
+//             setTimeout(() => setCopied(false), 1600);
+//         });
+//     };
+
+//     return (
+//         <div className="relative group my-3 rounded-xl overflow-hidden border border-border/25 bg-muted/25">
+//             {/* Header bar */}
+//             <div className="flex items-center justify-between px-3.5 py-2 border-b border-border/20">
+//                 <span className="text-[10px] font-mono text-muted-foreground/50 uppercase tracking-wider">
+//                     {lang}
+//                 </span>
+//                 <button
+//                     type="button"
+//                     onClick={handleCopy}
+//                     className={cn(
+//                         "flex items-center gap-1 px-2 py-0.5 rounded-md text-[10px]",
+//                         "text-muted-foreground/40 hover:text-muted-foreground",
+//                         "hover:bg-muted/60 transition-all duration-150"
+//                     )}
+//                 >
+//                     {copied
+//                         ? <><Check size={10} className="text-emerald-400" /> Copied</>
+//                         : <><Copy size={10} /> Copy</>
+//                     }
+//                 </button>
+//             </div>
+//             {/* Code */}
+//             <pre className="overflow-x-auto px-4 py-3 text-[12px] font-mono leading-relaxed text-foreground/85">
+//                 <code>{code}</code>
+//             </pre>
+//         </div>
+//     );
+// };
+
+
 const CodeBlock: React.FC<{
     inline?: boolean;
     className?: string;
     children?: React.ReactNode;
-}> = ({ inline, className, children }) => {
+    node?: any; // added for react-markdown passing the AST node
+}> = ({ inline, className, children, node }) => {
     const [copied, setCopied] = useState(false);
     const code = String(children ?? "").replace(/\n$/, "");
-    const lang = (className ?? "").replace("language-", "") || "text";
 
-    if (inline) {
+    // Check for language-xxx class
+    const match = /language-(\w+)/.exec(className || "");
+    const lang = match ? match[1] : "text";
+
+    // Since react-markdown v9+ removed the `inline` prop, we infer it:
+    // If it has no language class AND no newlines, it's inline.
+    const isInline = inline !== undefined
+        ? inline
+        : !match && !code.includes("\n");
+
+    if (isInline) {
         return (
             <code className={cn(
                 "px-1.5 py-0.5 rounded-md text-[11.5px] font-mono",
@@ -78,6 +146,7 @@ const CodeBlock: React.FC<{
 // ── Markdown component map ────────────────────────────────────────────────────
 
 const MD_COMPONENTS: React.ComponentProps<typeof ReactMarkdown>["components"] = {
+    pre: ({ children }) => <>{children}</>,
     code: CodeBlock as any,
     p: ({ children }) => (
         <p className="mb-2 last:mb-0 leading-relaxed text-[13px] text-foreground/90">

@@ -151,7 +151,7 @@ export default defineSchema({
         // (project can exist before workspace is provisioned)
         workspaceId: v.optional(v.id("workspaces")),
 
-        createdAt: v.number(),
+        createdAt: v.optional(v.number()),
         updatedAt: v.number(),
     })
         .index("by_userId", ["userId"])

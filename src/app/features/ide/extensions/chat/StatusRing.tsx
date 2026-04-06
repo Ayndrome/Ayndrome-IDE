@@ -6,8 +6,8 @@
 // tool        → pulsing filled dot with ring (blue)
 // awaiting    → breathing solid ring (amber) + orbit dot
 // error       → static red ring with X
-
-import React, { useEffect, useRef } from "react";
+'use-client'
+import React, { useEffect } from "react";
 import { cn } from "@/lib/utils";
 
 export type RingStatus =

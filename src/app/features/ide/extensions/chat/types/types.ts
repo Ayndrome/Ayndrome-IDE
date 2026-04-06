@@ -482,36 +482,121 @@ export type WebToolName =
     | string;
 
 export const approvalTypeOfWebTool: Partial<Record<WebToolName, 'edits' | 'terminal'>> = {
-    write_file:   'edits',
-    create_file:  'edits',
-    delete_file:  'edits',
+    write_file: 'edits',
+    create_file: 'edits',
+    delete_file: 'edits',
     run_terminal: 'terminal',
 };
+
 
 export type ToolApprovalType = 'edits' | 'terminal' | 'mcp';
 
 export type RawToolParams = Record<string, string>;
 
+export const PERSISTENT_TERMINAL_TOOL_DEFS = {
+    start_terminal: {
+        description: [
+            "Start a named persistent terminal session in the workspace.",
+            "Use this for long-running processes like dev servers, watchers, test runners.",
+            "The session persists until killed — you can send commands and read output later.",
+            "Example: start_terminal({ name: 'dev', command: 'npm run dev' })",
+        ].join(" "),
+        inputSchema: {
+            name: { type: "string", description: "Session name e.g. 'dev', 'tests', 'worker'" },
+            command: { type: "string", description: "Optional initial command to run on start" },
+        },
+    },
+
+    run_in_terminal: {
+        description: [
+            "Run a command in a named persistent session and return the output.",
+            "The session's shell state persists — cd, exports, etc. carry over between calls.",
+            "Use this instead of run_terminal when you need shell state to persist.",
+            "Output streams live to the user's terminal panel.",
+        ].join(" "),
+        inputSchema: {
+            name: { type: "string", description: "Session name (must already exist)" },
+            command: { type: "string", description: "Command to run" },
+            timeoutMs: { type: "number", description: "Timeout in ms (default 60000)" },
+        },
+    },
+
+    read_terminal: {
+        description: [
+            "Read recent output from a named terminal session.",
+            "Use this to check if a dev server started successfully,",
+            "or to read test results from a running process.",
+        ].join(" "),
+        inputSchema: {
+            name: { type: "string", description: "Session name" },
+            lines: { type: "number", description: "Number of lines to read (default 50)" },
+        },
+    },
+
+    kill_terminal: {
+        description: "Kill a named terminal session. Use when done with a long-running process.",
+        inputSchema: {
+            name: { type: "string", description: "Session name to kill" },
+        },
+    },
+} as const;
+
+
+type InferSchema<T> = {
+    [k in keyof T]: T[k] extends { type: 'string' } ? string :
+    T[k] extends { type: 'number' } ? number :
+    T[k] extends { type: 'boolean' } ? boolean : any
+
+}
+
+type PersistenTerminalParams = {
+
+    [k in keyof typeof PERSISTENT_TERMINAL_TOOL_DEFS]: InferSchema<typeof PERSISTENT_TERMINAL_TOOL_DEFS[k]['inputSchema']>
+
+}
+
 export type WebToolCallParams = {
-    read_file:      { filePath: string; startLine?: number; endLine?: number };
-    write_file:     { filePath: string; content: string };
-    create_file:    { filePath: string; isFolder?: boolean };
-    delete_file:    { filePath: string; recursive?: boolean };
+    read_file: { filePath: string; startLine?: number; endLine?: number };
+    write_file: { filePath: string; content: string };
+    create_file: { filePath: string; isFolder?: boolean };
+    delete_file: { filePath: string; recursive?: boolean };
     search_in_file: { filePath: string; query: string; isRegex?: boolean };
-    search_files:   { query: string; isRegex?: boolean; includePattern?: string };
+    search_files: { query: string; isRegex?: boolean; includePattern?: string };
     list_directory: { dirPath: string };
-    run_terminal:   { command: string; cwd?: string };
+    run_terminal: { command: string; cwd?: string };
+    // Persistent terminal tools
+    start_terminal: { name: string; command?: string };
+    run_in_terminal: { name: string; command: string; timeoutMs?: number };
+    read_terminal: { name: string; lines?: number };
+    kill_terminal: { name: string };
+    // Browser / Playwright tools
+    start_server: { command: string; port: number; name?: string };
+    take_screenshot: { url?: string; fullPage?: boolean; viewport?: { width: number; height: number }; selector?: string };
+    capture_page_state: { url?: string; viewport?: { width: number; height: number } };
+    interact_with_page: { url?: string; steps: Array<{ action: string; selector?: string; text?: string; url?: string; key?: string; value?: string; direction?: string; timeoutMs?: number; visible?: boolean; pattern?: string }>; screenshotOnEachStep?: boolean };
+    run_tests: { testFile?: string; pattern?: string; stream?: boolean };
 };
 
 export type WebToolResult = {
-    read_file:      { content: string; totalLines: number; truncated: boolean };
-    write_file:     { success: boolean; lintErrors?: LintError[] };
-    create_file:    { success: boolean };
-    delete_file:    { success: boolean };
+    read_file: { content: string; totalLines: number; truncated: boolean };
+    write_file: { success: boolean; lintErrors?: LintError[] };
+    create_file: { success: boolean };
+    delete_file: { success: boolean };
     search_in_file: { matchingLines: number[] };
-    search_files:   { filePaths: string[]; hasMore: boolean };
+    search_files: { filePaths: string[]; hasMore: boolean };
     list_directory: { entries: DirectoryEntry[] };
-    run_terminal:   { output: string; exitCode: number | null; timedOut: boolean };
+    run_terminal: { output: string; exitCode: number | null; timedOut: boolean };
+    // Persistent terminal results
+    start_terminal: { success: boolean; sessionName: string; pid: number };
+    run_in_terminal: { output: string; exitCode: number | null; timedOut: boolean };
+    read_terminal: { output: string };
+    kill_terminal: { success: boolean };
+    // Browser / Playwright results
+    start_server: { success: boolean; port: number; timeMs: number };
+    take_screenshot: { base64: string; width: number; height: number; url: string; timestamp: number };
+    capture_page_state: { screenshot: { base64: string; width: number; height: number }; consoleErrors: string[]; networkErrors: string[]; domSnapshot: string; title: string; url: string };
+    interact_with_page: { steps: Array<{ step: any; success: boolean; error?: string; screenshotBase64?: string }>; finalScreenshot: { base64: string }; passed: boolean; errors: string[] };
+    run_tests: { passed: number; failed: number; skipped: number; output: string; duration: number; failures: any[] };
 };
 
 export type ToolParams<T extends WebToolName> =
@@ -543,13 +628,13 @@ export type ToolMessage<T extends WebToolName = WebToolName> = {
     rawParams: RawToolParams;
     mcpServerName: string | undefined;
 } & (
-    | { type: 'invalid_params'; result: null; name: T }
-    | { type: 'tool_request';   result: null; name: T; params: ToolParams<T> }
-    | { type: 'running_now';    result: null; name: T; params: ToolParams<T> }
-    | { type: 'tool_error';     result: string; name: T; params: ToolParams<T> }
-    | { type: 'success';        result: Awaited<ToolResult<T>>; name: T; params: ToolParams<T> }
-    | { type: 'rejected';       result: null; name: T; params: ToolParams<T> }
-);
+        | { type: 'invalid_params'; result: null; name: T }
+        | { type: 'tool_request'; result: null; name: T; params: ToolParams<T> }
+        | { type: 'running_now'; result: null; name: T; params: ToolParams<T> }
+        | { type: 'tool_error'; result: string; name: T; params: ToolParams<T> }
+        | { type: 'success'; result: Awaited<ToolResult<T>>; name: T; params: ToolParams<T> }
+        | { type: 'rejected'; result: null; name: T; params: ToolParams<T> }
+    );
 
 export type InterruptedToolMessage = {
     role: 'interrupted_tool';
@@ -775,7 +860,7 @@ export type FileTreeNode = {
     updatedAt: number;
     // Frontend-only: children populated when building tree from flat list
     children?: FileTreeNode[];
-};      
+};
 
 // NEW: Workspace provisioning request/response
 // Sent to /api/workspace when opening a project
