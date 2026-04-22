@@ -218,7 +218,7 @@ export function createTerminalWSS(
 
     wss.on("connection", async (ws: WebSocket, req: IncomingMessage) => {
         const url = new URL(req.url ?? "", "http://localhost");
-        const workspaceId = url.searchParams.get("workspaceId");
+        let workspaceId = url.searchParams.get("workspaceId");
         const initCols = parseInt(url.searchParams.get("cols") ?? "120", 10);
         const initRows = parseInt(url.searchParams.get("rows") ?? "30", 10);
 

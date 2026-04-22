@@ -513,7 +513,7 @@ import {
     touchWorkspace,
     WORKSPACES_BASE_DIR,
 } from "../workspace/local-registry";
-
+import { spawn } from "child_process";
 // ── Config ────────────────────────────────────────────────────────────────────
 
 const SANDBOX_IMAGE = "web-ide-sandbox";
@@ -726,6 +726,128 @@ export type ExecResult = {
     timedOut: boolean;
 };
 
+// export async function execInSandbox(
+//     workspaceId: string,
+//     command: string,
+//     opts: {
+//         cwd?: string;
+//         timeoutMs?: number;
+//         onStdout?: (chunk: string) => void;
+//         onStderr?: (chunk: string) => void;
+//         env?: string[];
+//     } = {},
+// ): Promise<ExecResult> {
+//     const sandbox = await getOrCreateSandbox(workspaceId);
+//     sandbox.lastUsed = Date.now();
+//     touchWorkspace(workspaceId);
+
+//     const {
+//         cwd = CONTAINER_WORKSPACE,
+//         timeoutMs = EXEC_TIMEOUT_DEFAULT,
+//         onStdout,
+//         onStderr,
+//         env = [],
+//     } = opts;
+
+//     let stdout = "";
+//     let stderr = "";
+//     let output = "";
+//     let timedOut = false;
+
+//     // Create exec instance
+//     const exec = await sandbox.container.exec({
+//         Cmd: ["bash", "-c", command],
+//         WorkingDir: cwd,
+//         AttachStdout: true,
+//         AttachStderr: true,
+//         AttachStdin: false,
+//         Tty: false,    // non-interactive → clean demuxed output
+//         Env: env,
+//     });
+
+//     return new Promise((resolve) => {
+//         const timer = setTimeout(() => {
+//             timedOut = true;
+//             resolve({ stdout, stderr, output, exitCode: -1, timedOut: true });
+//         }, timeoutMs);
+
+//         exec.start({ hijack: true, stdin: false }, (err, stream) => {
+//             if (err || !stream) {
+//                 clearTimeout(timer);
+//                 resolve({
+//                     stdout: "",
+//                     stderr: err?.message ?? "exec failed to start",
+//                     output: err?.message ?? "exec failed to start",
+//                     exitCode: 1,
+//                     timedOut: false,
+//                 });
+//                 return;
+//             }
+
+//             // Docker multiplexes stdout and stderr on the same stream
+//             // modem.demuxStream separates them into two writable streams
+//             sandbox.container.modem.demuxStream(
+//                 stream,
+//                 // stdout writable
+//                 {
+//                     write(chunk: Buffer) {
+//                         const str = chunk.toString("utf8");
+//                         stdout += str;
+//                         output += str;
+//                         onStdout?.(str);
+//                     },
+//                     end() { },
+//                 } as any,
+//                 // stderr writable
+//                 {
+//                     write(chunk: Buffer) {
+//                         const str = chunk.toString("utf8");
+//                         stderr += str;
+//                         output += str;
+//                         onStderr?.(str);
+//                     },
+//                     end() { },
+//                 } as any,
+//             );
+
+//             stream.on("end", async () => {
+//                 clearTimeout(timer);
+//                 if (timedOut) return;
+
+//                 try {
+//                     const inspected = await exec.inspect();
+//                     resolve({
+//                         stdout: stdout.trim(),
+//                         stderr: stderr.trim(),
+//                         output: output.trim(),
+//                         exitCode: inspected.ExitCode ?? 0,
+//                         timedOut: false,
+//                     });
+//                 } catch {
+//                     resolve({
+//                         stdout: stdout.trim(),
+//                         stderr: stderr.trim(),
+//                         output: output.trim(),
+//                         exitCode: 0,
+//                         timedOut: false,
+//                     });
+//                 }
+//             });
+
+//             stream.on("error", (streamErr) => {
+//                 clearTimeout(timer);
+//                 resolve({
+//                     stdout,
+//                     stderr: streamErr.message,
+//                     output: output + streamErr.message,
+//                     exitCode: 1,
+//                     timedOut: false,
+//                 });
+//             });
+//         });
+//     });
+// }
+
 export async function execInSandbox(
     workspaceId: string,
     command: string,
@@ -734,116 +856,114 @@ export async function execInSandbox(
         timeoutMs?: number;
         onStdout?: (chunk: string) => void;
         onStderr?: (chunk: string) => void;
-        env?: string[];
+        env?: Record<string, string>;
     } = {},
-): Promise<ExecResult> {
-    const sandbox = await getOrCreateSandbox(workspaceId);
-    sandbox.lastUsed = Date.now();
-    touchWorkspace(workspaceId);
+): Promise<{ output: string; exitCode: number; timedOut: boolean }> {
 
-    const {
-        cwd = CONTAINER_WORKSPACE,
-        timeoutMs = EXEC_TIMEOUT_DEFAULT,
-        onStdout,
-        onStderr,
-        env = [],
-    } = opts;
+    const containerName = `web-ide-${workspaceId}`;
+    const timeoutMs = opts.timeoutMs ?? 60_000;
 
-    let stdout = "";
-    let stderr = "";
-    let output = "";
-    let timedOut = false;
+    // ── cwd validation ────────────────────────────────────────────────────────
+    // OCI error "Cwd must be an absolute path" = cwd was empty string or relative
+    // OCI error "chdir to cwd failed: not a directory" = path exists as a FILE
+    // Fix: validate cwd, fall back to /workspace if invalid
+    let cwd = opts.cwd ?? "/workspace";
+    if (!cwd || !cwd.startsWith("/")) {
+        console.warn(
+            `[Sandbox] cwd "${cwd}" is not absolute — falling back to /workspace`
+        );
+        cwd = "/workspace";
+    }
 
-    // Create exec instance
-    const exec = await sandbox.container.exec({
-        Cmd: ["bash", "-c", command],
-        WorkingDir: cwd,
-        AttachStdout: true,
-        AttachStderr: true,
-        AttachStdin: false,
-        Tty: false,    // non-interactive → clean demuxed output
-        Env: env,
+    // Check if cwd exists as a directory inside the container
+    // If not, fall back to /workspace to avoid the OCI chdir error
+    const cwdCheck = await new Promise<boolean>((resolve) => {
+        const check = spawn("docker", [
+            "exec",
+            containerName,
+            "test", "-d", cwd,
+        ]);
+        check.on("exit", code => resolve(code === 0));
+        check.on("error", () => resolve(false));
+        setTimeout(() => resolve(false), 3_000);
     });
 
+    if (!cwdCheck) {
+        console.warn(
+            `[Sandbox] cwd "${cwd}" does not exist in container — ` +
+            `falling back to /workspace`
+        );
+        cwd = "/workspace";
+    }
+
+    // ── Environment variables ─────────────────────────────────────────────────
+    // Always inject these so CLIs work correctly without a login shell
+    // docker exec without --login doesn't source .bashrc or .profile
+    const defaultEnv = {
+        HOME: "/home/devuser",
+        XDG_CONFIG_HOME: "/tmp/config",
+        NPM_CONFIG_CACHE: "/home/devuser/.npm-cache",
+        NPM_CONFIG_PREFIX: "/home/devuser/.npm-global",
+        PATH: "/home/devuser/.npm-global/bin:/usr/local/bin:/usr/bin:/bin:/usr/local/go/bin",
+        ...opts.env,
+    };
+
+    const envArgs = Object.entries(defaultEnv).flatMap(
+        ([k, v]) => ["--env", `${k}=${v}`]
+    );
+
+    console.log(
+        `[Sandbox] exec: ${containerName} | cwd: ${cwd} | cmd: ${command}`
+    );
+
+    const args = [
+        "exec",
+        "--user", "devuser",
+        ...envArgs,
+        "--workdir", cwd,
+        containerName,
+        "bash", "-c", command,
+    ];
+
     return new Promise((resolve) => {
+        const proc = spawn("docker", args);
+        let output = "";
+        let timedOut = false;
+
         const timer = setTimeout(() => {
             timedOut = true;
-            resolve({ stdout, stderr, output, exitCode: -1, timedOut: true });
+            proc.kill("SIGTERM");
+            console.warn(
+                `[Sandbox] Command timed out after ${timeoutMs}ms: ${command.slice(0, 80)}`
+            );
         }, timeoutMs);
 
-        exec.start({ hijack: true, stdin: false }, (err, stream) => {
-            if (err || !stream) {
-                clearTimeout(timer);
-                resolve({
-                    stdout: "",
-                    stderr: err?.message ?? "exec failed to start",
-                    output: err?.message ?? "exec failed to start",
-                    exitCode: 1,
-                    timedOut: false,
-                });
-                return;
-            }
+        proc.stdout.on("data", (chunk: Buffer) => {
+            const str = chunk.toString();
+            output += str;
+            opts.onStdout?.(str);
+        });
 
-            // Docker multiplexes stdout and stderr on the same stream
-            // modem.demuxStream separates them into two writable streams
-            sandbox.container.modem.demuxStream(
-                stream,
-                // stdout writable
-                {
-                    write(chunk: Buffer) {
-                        const str = chunk.toString("utf8");
-                        stdout += str;
-                        output += str;
-                        onStdout?.(str);
-                    },
-                    end() { },
-                } as any,
-                // stderr writable
-                {
-                    write(chunk: Buffer) {
-                        const str = chunk.toString("utf8");
-                        stderr += str;
-                        output += str;
-                        onStderr?.(str);
-                    },
-                    end() { },
-                } as any,
+        proc.stderr.on("data", (chunk: Buffer) => {
+            const str = chunk.toString();
+            output += str;
+            opts.onStderr?.(str);
+        });
+
+        proc.on("exit", (code) => {
+            clearTimeout(timer);
+            const exitCode = code ?? (timedOut ? -1 : 1);
+            console.log(
+                `[Sandbox] exit ${exitCode} | timedOut: ${timedOut} | ` +
+                `output: ${output.length} chars`
             );
+            resolve({ output, exitCode, timedOut });
+        });
 
-            stream.on("end", async () => {
-                clearTimeout(timer);
-                if (timedOut) return;
-
-                try {
-                    const inspected = await exec.inspect();
-                    resolve({
-                        stdout: stdout.trim(),
-                        stderr: stderr.trim(),
-                        output: output.trim(),
-                        exitCode: inspected.ExitCode ?? 0,
-                        timedOut: false,
-                    });
-                } catch {
-                    resolve({
-                        stdout: stdout.trim(),
-                        stderr: stderr.trim(),
-                        output: output.trim(),
-                        exitCode: 0,
-                        timedOut: false,
-                    });
-                }
-            });
-
-            stream.on("error", (streamErr) => {
-                clearTimeout(timer);
-                resolve({
-                    stdout,
-                    stderr: streamErr.message,
-                    output: output + streamErr.message,
-                    exitCode: 1,
-                    timedOut: false,
-                });
-            });
+        proc.on("error", (err) => {
+            clearTimeout(timer);
+            console.error(`[Sandbox] spawn error:`, err.message);
+            resolve({ output: err.message, exitCode: -1, timedOut: false });
         });
     });
 }
