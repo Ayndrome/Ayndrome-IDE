@@ -54,17 +54,31 @@ type ToolMeta = {
 };
 
 const TOOL_META: Record<string, ToolMeta> = {
-    read_file: { icon: <FileText size={11} />, verbNow: "Reading", verbDone: "Read", verbPropose: "Read file" },
-    write_file: { icon: <FilePlus size={11} />, verbNow: "Writing", verbDone: "Wrote", verbPropose: "Write file" },
-    create_file: { icon: <FilePlus size={11} />, verbNow: "Creating", verbDone: "Created", verbPropose: "Create file" },
-    delete_file: { icon: <FileX size={11} />, verbNow: "Deleting", verbDone: "Deleted", verbPropose: "Delete file" },
-    search_files: { icon: <Search size={11} />, verbNow: "Searching", verbDone: "Searched", verbPropose: "Search files" },
+    read_file: { icon: <FileText size={11} />, verbNow: "Analyzing", verbDone: "Analyzed", verbPropose: "Analyze" },
+    write_file: { icon: <FilePlus size={11} />, verbNow: "Editing", verbDone: "Edited", verbPropose: "Edit" },
+    create_file: { icon: <FilePlus size={11} />, verbNow: "Creating", verbDone: "Created", verbPropose: "Create" },
+    delete_file: { icon: <FileX size={11} />, verbNow: "Deleting", verbDone: "Deleted", verbPropose: "Delete" },
+    search_files: { icon: <Search size={11} />, verbNow: "Searching", verbDone: "Searched", verbPropose: "Search" },
     search_in_file: { icon: <Search size={11} />, verbNow: "Searching in", verbDone: "Searched in", verbPropose: "Search in file" },
     list_directory: { icon: <FolderOpen size={11} />, verbNow: "Listing", verbDone: "Listed", verbPropose: "List directory" },
     run_terminal: { icon: <Terminal size={11} />, verbNow: "Running", verbDone: "Ran terminal", verbPropose: "Run terminal" },
 };
 
 // ── Filename extractor ────────────────────────────────────────────────────────
+
+/** Parse linesAdded / linesRemoved from the __STRUCT__ base64 tag in write_file results */
+function extractWriteStats(result: any): { added: number; removed: number } | null {
+    const content: string = result?.content ?? "";
+    const match = content.match(/<!--__STRUCT__([A-Za-z0-9+/=]+)-->/);
+    if (!match) return null;
+    try {
+        const decoded = JSON.parse(atob(match[1]));
+        if (typeof decoded.linesAdded === "number" || typeof decoded.linesRemoved === "number") {
+            return { added: decoded.linesAdded ?? 0, removed: decoded.linesRemoved ?? 0 };
+        }
+    } catch { /* ignore */ }
+    return null;
+}
 
 function extractLabel(toolName: WebToolName, rawParams: Record<string, any>): string {
     const p = rawParams ?? {};
@@ -303,15 +317,7 @@ export const ToolCard: React.FC<ToolCardProps> = ({
     const meta = TOOL_META[toolName];
     const label = extractLabel(toolName, rawParams);
 
-    // Auto-open while running; user can toggle after
-    const [open, setOpen] = useState(toolState === "running" || toolState === "success");
-    const [userToggled, setUserToggled] = useState(false);
-
-    // When transitioning running → success, keep open unless user closed manually
-    useEffect(() => {
-        if (toolState === "running" && !userToggled) setOpen(true);
-        if (toolState === "success" && !userToggled) setOpen(true);
-    }, [toolState, userToggled]);
+    const [open, setOpen] = useState(false);
 
     const hasContent =
         (toolState === "success" && result != null) ||
@@ -342,7 +348,6 @@ export const ToolCard: React.FC<ToolCardProps> = ({
                 onClick={() => {
                     if (!hasContent) return;
                     setOpen((v) => !v);
-                    setUserToggled(true);
                 }}
             >
                 {/* Chevron */}
@@ -387,8 +392,18 @@ export const ToolCard: React.FC<ToolCardProps> = ({
                     )}
                 </span>
 
-                {/* Right: status icon or ring */}
-                <div className="flex-shrink-0 ml-auto">
+                {/* Right: diff stats + status icon */}
+                <div className="flex-shrink-0 ml-auto flex items-center gap-2">
+                    {toolState === "success" && (toolName === "write_file" || toolName === "create_file") && (() => {
+                        const stats = extractWriteStats(result);
+                        if (!stats) return null;
+                        return (
+                            <span className="flex items-center gap-1 font-mono text-[10px]">
+                                {stats.added > 0 && <span className="text-emerald-400/80">+{stats.added}</span>}
+                                {stats.removed > 0 && <span className="text-red-400/70">-{stats.removed}</span>}
+                            </span>
+                        );
+                    })()}
                     {toolState === "running" ? (
                         <StatusRing status="tool" size={16} />
                     ) : (
