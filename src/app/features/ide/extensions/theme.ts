@@ -1,5 +1,6 @@
 import { EditorView } from "@codemirror/view";
 import { HighlightStyle, syntaxHighlighting } from "@codemirror/language";
+import { indentationMarkers } from "@replit/codemirror-indentation-markers";
 import { tags as t } from "@lezer/highlight";
 
 // ── GitHub Dark palette (matches github-vscode-theme) ────────────────────────
@@ -212,6 +213,21 @@ export const githubDark = [
   githubDarkTheme,
   syntaxHighlighting(githubDarkHighlight),
 ];
+
+// ── Indentation markers — subtle, theme-matched ───────────────────────────────
+// Uses the palette border color (#30363d) for inactive guides and
+// fgInactive (#484f58) for the guide on the active indentation level.
+// Both are low-contrast so they never compete with syntax highlighting.
+export const githubDarkIndentMarkers = indentationMarkers({
+  colors: {
+    light: GH.border, // inactive guide — very subtle
+    dark: GH.border, // same for dark context
+    activeLight: GH.fgInactive, // active-block guide — slightly brighter
+    activeDark: GH.fgInactive,
+  },
+  highlightActiveBlock: true, // highlight the current indent block
+  hideFirstIndent: false, // show first-level guides too
+});
 
 // src/app/features/ide/extensions/theme.ts
 // Updated palette — same structure, new colors matching the design

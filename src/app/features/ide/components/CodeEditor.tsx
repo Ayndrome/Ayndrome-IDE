@@ -262,13 +262,14 @@ import { basicSetup } from "codemirror";
 import { javascript } from "@codemirror/lang-javascript";
 import { python } from "@codemirror/lang-python";
 import { history } from "@codemirror/commands";
-import { githubDark } from "../extensions/theme";
+import { githubDark, githubDarkIndentMarkers } from "../extensions/theme";
 import { useEditorStore } from "@/src/store/editor-store";
 import { useDiffStore } from "@/src/store/diff-store";
 import { useStreamingWriterStore } from "@/src/store/streaming-writer-store";
 import { useIDEStore } from "@/src/store/ide-store";
 import { miniMap } from "./minmap";
-import { indentationMarkers } from "@replit/codemirror-indentation-markers";
+// indentationMarkers now exported from theme.ts as githubDarkIndentMarkers
+
 import { suggestions } from "../extensions/autocompletion";
 import { useSaveShortcut } from "../../projects/hooks/use-save-shortcut";
 import { diffDecorationExtension } from "../extensions/editor/diff-decoration";
@@ -280,6 +281,7 @@ import {
 } from "../extensions/editor/lsp-client";
 import { lspExtension } from "../extensions/editor/lsp-extension";
 import { ctrlClickExtension } from "../extensions/editor/ctrl-click";
+import { oneDark } from '@codemirror/theme-one-dark'
 
 export const CodeEditor = () => {
     useSaveShortcut();
@@ -376,9 +378,12 @@ export const CodeEditor = () => {
 
             langExt,
             githubDark,
+            
+            
             history(),
             miniMap(),
-            indentationMarkers(),
+            githubDarkIndentMarkers,
+
             suggestions({
                 fileName: activeTab?.fileName ?? "index.ts",
                 debounceRef,
