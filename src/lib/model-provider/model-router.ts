@@ -7,6 +7,12 @@ import { type LanguageModel } from "ai";
 import type { ProviderName } from "./provider-registry";
 import type { ProviderCredentials, ModelSelection } from "./provider-store";
 
+export function getBaseUrl() {
+    if (typeof window !== "undefined") return window.location.origin;
+    if (process.env.NEXT_PUBLIC_APP_URL) return process.env.NEXT_PUBLIC_APP_URL;
+    return `http://localhost:${process.env.PORT || 3000}`;
+}
+
 // ── Provider SDK factory ──────────────────────────────────────────────────────
 
 export async function getModelInstance(
@@ -18,7 +24,7 @@ export async function getModelInstance(
 
     // All cloud providers route through /api/llm-proxy to avoid CORS.
     // The proxy forwards requests to the real provider API server-side.
-    const PROXY = "/api/llm-proxy";
+    const PROXY = getBaseUrl() + "/api/llm-proxy";
 
     switch (provider) {
 
@@ -54,8 +60,9 @@ export async function getModelInstance(
 
         // ── DeepSeek (OpenAI-compatible) ──────────────────────────────────────
         case "deepseek": {
-            const { createOpenAI } = await import("@ai-sdk/openai");
+            const { createOpenAICompatible: createOpenAI } = await import("@ai-sdk/openai-compatible");
             const client = createOpenAI({
+                name: "deepseek",
                 apiKey: credentials.apiKey ?? process.env.DEEPSEEK_API_KEY ?? "",
                 baseURL: `${PROXY}/deepseek/v1`,
             });
@@ -64,8 +71,9 @@ export async function getModelInstance(
 
         // ── xAI ───────────────────────────────────────────────────────────────
         case "xai": {
-            const { createOpenAI } = await import("@ai-sdk/openai");
+            const { createOpenAICompatible: createOpenAI } = await import("@ai-sdk/openai-compatible");
             const client = createOpenAI({
+                name: "xai",
                 apiKey: credentials.apiKey ?? process.env.XAI_API_KEY ?? "",
                 baseURL: `${PROXY}/xai/v1`,
             });
@@ -74,8 +82,9 @@ export async function getModelInstance(
 
         // ── Groq ──────────────────────────────────────────────────────────────
         case "groq": {
-            const { createOpenAI } = await import("@ai-sdk/openai");
+            const { createOpenAICompatible: createOpenAI } = await import("@ai-sdk/openai-compatible");
             const client = createOpenAI({
+                name: "groq",
                 apiKey: credentials.apiKey ?? process.env.GROQ_API_KEY ?? "",
                 baseURL: `${PROXY}/groq/v1`,
             });
@@ -84,8 +93,9 @@ export async function getModelInstance(
 
         // ── Mistral ───────────────────────────────────────────────────────────
         case "mistral": {
-            const { createOpenAI } = await import("@ai-sdk/openai");
+            const { createOpenAICompatible: createOpenAI } = await import("@ai-sdk/openai-compatible");
             const client = createOpenAI({
+                name: "mistral",
                 apiKey: credentials.apiKey ?? process.env.MISTRAL_API_KEY ?? "",
                 baseURL: `${PROXY}/mistral/v1`,
             });
@@ -94,8 +104,9 @@ export async function getModelInstance(
 
         // ── OpenRouter ────────────────────────────────────────────────────────
         case "openrouter": {
-            const { createOpenAI } = await import("@ai-sdk/openai");
+            const { createOpenAICompatible: createOpenAI } = await import("@ai-sdk/openai-compatible");
             const client = createOpenAI({
+                name: "openrouter",
                 apiKey: credentials.apiKey ?? process.env.OPENROUTER_API_KEY ?? "",
                 baseURL: `${PROXY}/openrouter/v1`,
                 headers: {
@@ -108,9 +119,10 @@ export async function getModelInstance(
 
         // ── Ollama ────────────────────────────────────────────────────────────
         case "ollama": {
-            const { createOpenAI } = await import("@ai-sdk/openai");
+            const { createOpenAICompatible: createOpenAI } = await import("@ai-sdk/openai-compatible");
             const endpoint = credentials.endpoint ?? "http://localhost:11434";
             const client = createOpenAI({
+                name: "ollama",
                 apiKey: "ollama",   // Ollama doesn't check this
                 baseURL: `${endpoint}/v1`,
             });
@@ -119,9 +131,10 @@ export async function getModelInstance(
 
         // ── LM Studio ─────────────────────────────────────────────────────────
         case "lmstudio": {
-            const { createOpenAI } = await import("@ai-sdk/openai");
+            const { createOpenAICompatible: createOpenAI } = await import("@ai-sdk/openai-compatible");
             const endpoint = credentials.endpoint ?? "http://localhost:1234";
             const client = createOpenAI({
+                name: "lmstudio",
                 apiKey: "lmstudio",
                 baseURL: `${endpoint}/v1`,
             });
@@ -130,8 +143,9 @@ export async function getModelInstance(
 
         // ── OpenAI Compatible ─────────────────────────────────────────────────
         case "openai-compatible": {
-            const { createOpenAI } = await import("@ai-sdk/openai");
+            const { createOpenAICompatible: createOpenAI } = await import("@ai-sdk/openai-compatible");
             const client = createOpenAI({
+                name: "openai-compatible",
                 apiKey: credentials.apiKey ?? "",
                 baseURL: credentials.endpoint ?? "",
             });
