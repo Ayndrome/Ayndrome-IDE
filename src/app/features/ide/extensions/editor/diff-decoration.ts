@@ -1,369 +1,438 @@
 // src/app/features/ide/extensions/editor/diff-decoration.ts
 // CodeMirror extension that renders diff highlights directly in the editor.
-// Green background + gutter widget for added lines.
-// Red background + strikethrough for removed lines.
-// Per-hunk accept/reject buttons in the gutter.
+// Green background for added lines (using correct doc.line().from positions).
+// Inline block widget at top of each hunk with Accept/Reject buttons.
+// Ghost red lines as block widgets for removed content.
 // Driven by a StateField so React doesn't need to touch the view directly.
 
 import {
-    StateField,
-    StateEffect,
-    RangeSetBuilder,
-    type Extension,
-    type Range,
+  StateField,
+  StateEffect,
+  RangeSetBuilder,
+  type Extension,
+  type Range,
 } from "@codemirror/state";
 import {
-    Decoration,
-    DecorationSet,
-    EditorView,
-    GutterMarker,
-    gutter,
-    WidgetType,
+  Decoration,
+  DecorationSet,
+  EditorView,
+  WidgetType,
 } from "@codemirror/view";
-import type { FileDiff, DiffHunk } from "../chat/agent/diff-engine";
+import type { FileDiff } from "../chat/agent/diff-engine";
 
 // ── Effects (dispatch these to update diff state in the editor) ───────────────
 
 export const setDiffEffect = StateEffect.define<FileDiff | null>();
-export const acceptHunkEffect = StateEffect.define<string>();   // hunkId
-export const rejectHunkEffect = StateEffect.define<string>();  // hunkId
+export const acceptHunkEffect = StateEffect.define<string>(); // hunkId
+export const rejectHunkEffect = StateEffect.define<string>(); // hunkId
 
 // ── State field ───────────────────────────────────────────────────────────────
 // Holds the current FileDiff. Null = no diff active.
 
 export const diffStateField = StateField.define<FileDiff | null>({
-    create: () => null,
-    update(current, tr) {
-        for (const effect of tr.effects) {
-            if (effect.is(setDiffEffect)) return effect.value;
-            if (effect.is(acceptHunkEffect)) {
-                if (!current) return current;
-                return {
-                    ...current,
-                    hunks: current.hunks.map(h =>
-                        h.id === effect.value ? { ...h, accepted: true } : h
-                    ),
-                };
-            }
-            if (effect.is(rejectHunkEffect)) {
-                if (!current) return current;
-                return {
-                    ...current,
-                    hunks: current.hunks.map(h =>
-                        h.id === effect.value ? { ...h, accepted: false } : h
-                    ),
-                };
-            }
-        }
-        return current;
-    },
-    provide: field => [
-        // Line decorations (background highlights)
-        EditorView.decorations.from(field, diff => buildLineDecorations(diff)),
-    ],
+  create: () => null,
+  update(current, tr) {
+    for (const effect of tr.effects) {
+      if (effect.is(setDiffEffect)) return effect.value;
+      if (effect.is(acceptHunkEffect)) {
+        if (!current) return current;
+        return {
+          ...current,
+          hunks: current.hunks.map((h) =>
+            h.id === effect.value ? { ...h, accepted: true } : h,
+          ),
+        };
+      }
+      if (effect.is(rejectHunkEffect)) {
+        if (!current) return current;
+        return {
+          ...current,
+          hunks: current.hunks.map((h) =>
+            h.id === effect.value ? { ...h, accepted: false } : h,
+          ),
+        };
+      }
+    }
+    return current;
+  },
 });
 
 // ── Line background decorations ───────────────────────────────────────────────
+// Uses EditorView.decorations.compute so we can access state.doc.line()
+// which gives us the correct character position from a 1-based line number.
 
-const addedLineDeco = Decoration.line({ class: "cm-diff-added" });
-const removedLineDeco = Decoration.line({ class: "cm-diff-removed" });
-const modifiedLineDeco = Decoration.line({ class: "cm-diff-modified" });
+function buildLineDecorations(
+  diff: FileDiff | null,
+  state: import("@codemirror/state").EditorState,
+): DecorationSet {
+  if (!diff || diff.hunks.length === 0) return Decoration.none;
 
-function buildLineDecorations(diff: FileDiff | null): DecorationSet {
-    if (!diff || diff.hunks.length === 0) return Decoration.none;
+  const addedLineDeco = Decoration.line({ class: "cm-diff-added" });
+  const builder = new RangeSetBuilder<Decoration>();
+  const decos: Array<Range<Decoration>> = [];
 
-    // We're decorating the NEW content (what's in the editor).
-    // Added lines = green. The editor only shows the new file,
-    // so we highlight added lines green and mark the line where
-    // content was removed with a red marker widget.
+  const totalLines = state.doc.lines;
 
-    const builder = new RangeSetBuilder<Decoration>();
-    const decos: Array<Range<Decoration>> = [];
+  for (const hunk of diff.hunks) {
+    if (hunk.accepted === false) continue;
 
-    for (const hunk of diff.hunks) {
-        if (hunk.accepted === false) continue; // rejected — don't highlight
-
-        for (const line of hunk.lines) {
-            if (line.type === "added" && line.newLineNum != null) {
-                decos.push(
-                    addedLineDeco.range(line.newLineNum - 1)
-                );
-            }
-        }
+    for (const line of hunk.lines) {
+      if (line.type === "added" && line.newLineNum != null) {
+        const lineNum = line.newLineNum;
+        if (lineNum < 1 || lineNum > totalLines) continue;
+        // Correct API: resolve the character position of the line start
+        const from = state.doc.line(lineNum).from;
+        decos.push(addedLineDeco.range(from));
+      }
     }
+  }
 
-    // Sort by position (required by RangeSetBuilder)
-    decos.sort((a, b) => a.from - b.from);
-    for (const d of decos) builder.add(d.from, d.from, d.value);
+  // Sort by position (required by RangeSetBuilder)
+  decos.sort((a, b) => a.from - b.from);
+  // Deduplicate (same line could appear in overlapping hunks)
+  const seen = new Set<number>();
+  for (const d of decos) {
+    if (seen.has(d.from)) continue;
+    seen.add(d.from);
+    builder.add(d.from, d.from, d.value);
+  }
 
-    return builder.finish();
+  return builder.finish();
 }
 
-// ── Gutter marker widgets ─────────────────────────────────────────────────────
-// Accept/reject buttons rendered in the gutter per hunk.
+// ── Hunk action widget ─────────────────────────────────────────────────────────
+// Rendered as a block widget BEFORE the first added line of each hunk.
+// This appears inline in the editor content (above the green lines),
+// NOT in the gutter, so it never conflicts with the line number gutter.
 
-class HunkActionWidget extends GutterMarker {
-    constructor(
-        private hunkId: string,
-        private accepted: boolean | null,
-        private isFirst: boolean,   // show buttons only on first line of hunk
-    ) { super(); }
+class HunkActionWidget extends WidgetType {
+  constructor(
+    private hunkId: string,
+    private accepted: boolean | null,
+    private oldStart: number,
+    private oldCount: number,
+    private newStart: number,
+    private newCount: number,
+  ) {
+    super();
+  }
 
-    eq(other: HunkActionWidget): boolean {
-        return (
-            this.hunkId === other.hunkId &&
-            this.accepted === other.accepted &&
-            this.isFirst === other.isFirst
-        );
+  eq(other: WidgetType): boolean {
+    const o = other as HunkActionWidget;
+    return this.hunkId === o.hunkId && this.accepted === o.accepted;
+  }
+
+  toDOM(): HTMLElement {
+    const wrap = document.createElement("div");
+    wrap.className = "cm-diff-hunk-header";
+    wrap.style.cssText = [
+      "display:flex;align-items:center;justify-content:space-between;",
+      "padding:1px 8px;",
+      "background:#161b22;",
+      "border-top:1px solid #30363d;",
+      "border-bottom:1px solid #21262d;",
+      "font-family:var(--font-mono,monospace);",
+      "font-size:11px;",
+      "color:#6e7681;",
+      "user-select:none;",
+      "min-height:20px;",
+    ].join("");
+
+    const label = document.createElement("span");
+    label.textContent = `@@ -${this.oldStart},${this.oldCount} +${this.newStart},${this.newCount} @@`;
+    wrap.appendChild(label);
+
+    const actions = document.createElement("div");
+    actions.style.cssText = "display:flex;align-items:center;gap:4px;";
+
+    if (this.accepted === true) {
+      const badge = document.createElement("span");
+      badge.textContent = "✓ Accepted";
+      badge.style.cssText =
+        "font-size:10px;color:#3fb950;font-weight:600;padding:0 4px;";
+      actions.appendChild(badge);
+    } else if (this.accepted === false) {
+      const badge = document.createElement("span");
+      badge.textContent = "✕ Rejected";
+      badge.style.cssText =
+        "font-size:10px;color:#ff7b72;font-weight:600;padding:0 4px;";
+      actions.appendChild(badge);
+    } else {
+      // Undecided — show accept/reject buttons
+      const acceptBtn = document.createElement("button");
+      acceptBtn.textContent = "✓ Accept";
+      acceptBtn.title = "Accept this change";
+      acceptBtn.dataset.hunkId = this.hunkId;
+      acceptBtn.dataset.action = "accept";
+      acceptBtn.style.cssText = [
+        "font-size:10px;font-weight:600;",
+        "padding:1px 6px;border-radius:3px;cursor:pointer;",
+        "background:rgba(35,134,54,0.15);color:#3fb950;",
+        "border:1px solid rgba(35,134,54,0.35);",
+        "line-height:1.4;",
+      ].join("");
+
+      const rejectBtn = document.createElement("button");
+      rejectBtn.textContent = "✕ Reject";
+      rejectBtn.title = "Reject this change";
+      rejectBtn.dataset.hunkId = this.hunkId;
+      rejectBtn.dataset.action = "reject";
+      rejectBtn.style.cssText = [
+        "font-size:10px;font-weight:600;",
+        "padding:1px 6px;border-radius:3px;cursor:pointer;",
+        "background:rgba(218,54,51,0.15);color:#ff7b72;",
+        "border:1px solid rgba(218,54,51,0.35);",
+        "line-height:1.4;",
+      ].join("");
+
+      actions.appendChild(acceptBtn);
+      actions.appendChild(rejectBtn);
     }
 
-    toDOM(): HTMLElement {
-        const wrap = document.createElement("div");
-        wrap.className = "cm-diff-gutter-actions";
-        wrap.style.cssText = "display:flex;align-items:center;gap:2px;height:100%;padding:0 2px;";
+    wrap.appendChild(actions);
+    return wrap;
+  }
 
-        if (!this.isFirst) {
-            // Non-first lines of hunk — just show colored dot
-            const dot = document.createElement("span");
-            dot.style.cssText = "width:3px;height:3px;border-radius:50%;margin:auto;";
-            dot.style.backgroundColor =
-                this.accepted === true ? "#238636" :
-                    this.accepted === false ? "#da3633" : "#388bfd";
-            wrap.appendChild(dot);
-            return wrap;
-        }
-
-        if (this.accepted === true) {
-            const badge = document.createElement("span");
-            badge.textContent = "✓";
-            badge.style.cssText = "font-size:10px;color:#3fb950;font-weight:600;padding:0 2px;";
-            wrap.appendChild(badge);
-            return wrap;
-        }
-
-        if (this.accepted === false) {
-            const badge = document.createElement("span");
-            badge.textContent = "✕";
-            badge.style.cssText = "font-size:10px;color:#ff7b72;font-weight:600;padding:0 2px;";
-            wrap.appendChild(badge);
-            return wrap;
-        }
-
-        // Undecided — show accept/reject buttons
-        const acceptBtn = document.createElement("button");
-        acceptBtn.textContent = "✓";
-        acceptBtn.title = "Accept this change";
-        acceptBtn.dataset.hunkId = this.hunkId;
-        acceptBtn.dataset.action = "accept";
-        acceptBtn.style.cssText = [
-            "font-size:9px;font-weight:700;",
-            "padding:0 3px;height:14px;border-radius:2px;cursor:pointer;",
-            "background:rgba(35,134,54,0.2);color:#3fb950;",
-            "border:1px solid rgba(35,134,54,0.4);",
-            "line-height:1;",
-        ].join("");
-
-        const rejectBtn = document.createElement("button");
-        rejectBtn.textContent = "✕";
-        rejectBtn.title = "Reject this change";
-        rejectBtn.dataset.hunkId = this.hunkId;
-        rejectBtn.dataset.action = "reject";
-        rejectBtn.style.cssText = [
-            "font-size:9px;font-weight:700;",
-            "padding:0 3px;height:14px;border-radius:2px;cursor:pointer;",
-            "background:rgba(218,54,51,0.2);color:#ff7b72;",
-            "border:1px solid rgba(218,54,51,0.4);",
-            "line-height:1;",
-        ].join("");
-
-        wrap.appendChild(acceptBtn);
-        wrap.appendChild(rejectBtn);
-        return wrap;
-    }
+  get estimatedHeight(): number {
+    return 22;
+  }
+  ignoreEvent(_event: Event): boolean {
+    return false;
+  }
 }
 
-// ── Gutter extension ──────────────────────────────────────────────────────────
+// ── Build hunk header widgets ─────────────────────────────────────────────────
 
-function buildDiffGutter(
-    onAccept: (hunkId: string) => void,
-    onReject: (hunkId: string) => void,
-): Extension {
-    return gutter({
-        class: "cm-diff-gutter",
-        lineMarker(view, line) {
-            const diff = view.state.field(diffStateField, false);
-            if (!diff) return null;
+function buildHunkHeaderWidgets(
+  diff: FileDiff | null,
+  state: import("@codemirror/state").EditorState,
+  onAccept: (hunkId: string) => void,
+  onReject: (hunkId: string) => void,
+): DecorationSet {
+  if (!diff || diff.hunks.length === 0) return Decoration.none;
 
-            const lineNum = view.state.doc.lineAt(line.from).number;
+  const widgets: Array<Range<Decoration>> = [];
+  const totalLines = state.doc.lines;
 
-            for (const hunk of diff.hunks) {
-                if (hunk.accepted === false) continue;
+  for (const hunk of diff.hunks) {
+    // Find the first new-file line in this hunk
+    const firstNewLine = hunk.lines.find((l) => l.newLineNum != null);
+    if (!firstNewLine?.newLineNum) continue;
 
-                for (let i = 0; i < hunk.lines.length; i++) {
-                    const dl = hunk.lines[i];
-                    if (dl.type === "added" && dl.newLineNum === lineNum) {
-                        const isFirstInHunk = i === 0 ||
-                            hunk.lines.slice(0, i).every(l => l.type !== "added");
-                        return new HunkActionWidget(
-                            hunk.id,
-                            hunk.accepted,
-                            isFirstInHunk,
-                        );
-                    }
-                }
-            }
-            return null;
-        },
-        domEventHandlers: {
-            click(view, line, event) {
-                const target = event.target as HTMLElement;
-                const hunkId = target.dataset?.hunkId;
-                const action = target.dataset?.action;
-                if (!hunkId || !action) return false;
+    const lineNum = firstNewLine.newLineNum;
+    if (lineNum < 1 || lineNum > totalLines) continue;
 
-                if (action === "accept") {
-                    onAccept(hunkId);
-                    view.dispatch({ effects: acceptHunkEffect.of(hunkId) });
-                }
-                if (action === "reject") {
-                    onReject(hunkId);
-                    view.dispatch({ effects: rejectHunkEffect.of(hunkId) });
-                }
-                return true;
-            },
-        },
-        initialSpacer: () => new HunkActionWidget("", null, false),
-    });
+    const from = state.doc.line(lineNum).from;
+
+    widgets.push(
+      Decoration.widget({
+        widget: new HunkActionWidget(
+          hunk.id,
+          hunk.accepted,
+          hunk.oldStart,
+          hunk.oldCount,
+          hunk.newStart,
+          hunk.newCount,
+        ),
+        side: -1, // before the line
+        block: true,
+      }).range(from),
+    );
+  }
+
+  widgets.sort((a, b) => a.from - b.from);
+  const builder = new RangeSetBuilder<Decoration>();
+  for (const w of widgets) builder.add(w.from, w.from, w.value);
+  return builder.finish();
 }
 
 // ── Removed-line widget ───────────────────────────────────────────────────────
-// Renders deleted lines as red ghost lines between editor lines.
+// Renders deleted lines as red ghost lines BEFORE the position where they were.
 
 class RemovedLinesWidget extends WidgetType {
-    constructor(private lines: string[]) { super(); }
+  constructor(private lines: string[]) {
+    super();
+  }
 
-    eq(other: RemovedLinesWidget): boolean {
-        return this.lines.join("\n") === other.lines.join("\n");
+  eq(other: WidgetType): boolean {
+    return (
+      this.lines.join("\n") === (other as RemovedLinesWidget).lines.join("\n")
+    );
+  }
+
+  toDOM(): HTMLElement {
+    const wrap = document.createElement("div");
+    wrap.className = "cm-diff-removed-widget";
+    wrap.style.cssText = [
+      "background:rgba(255,123,114,0.06);",
+      "border-left:2px solid #da3633;",
+      "font-family:var(--cm-font-family,monospace);",
+      "font-size:var(--cm-font-size,13px);",
+      "line-height:1.6;",
+      "white-space:pre;",
+      "opacity:0.75;",
+      "pointer-events:none;",
+      "padding:0 4px;",
+    ].join("");
+
+    for (const line of this.lines) {
+      const div = document.createElement("div");
+      div.style.cssText = "color:#ffc2c2;";
+      div.textContent = "- " + (line || " ");
+      wrap.appendChild(div);
     }
+    return wrap;
+  }
 
-    toDOM(): HTMLElement {
-        const wrap = document.createElement("div");
-        wrap.className = "cm-diff-removed-widget";
-        wrap.style.cssText = [
-            "background:rgba(255,123,114,0.08);",
-            "border-left:2px solid #da3633;",
-            "font-family:var(--cm-font-family, monospace);",
-            "font-size:var(--cm-font-size, 13px);",
-            "line-height:1.6;",
-            "white-space:pre;",
-            "opacity:0.7;",
-            "pointer-events:none;",
-            "padding:0 4px;",
-        ].join("");
-
-        for (const line of this.lines) {
-            const div = document.createElement("div");
-            div.style.cssText = "color:#ffc2c2;";
-            div.textContent = "- " + (line || " ");
-            wrap.appendChild(div);
-        }
-        return wrap;
-    }
-
-    get estimatedHeight(): number {
-        return this.lines.length * 21;
-    }
+  get estimatedHeight(): number {
+    return this.lines.length * 21;
+  }
 }
 
 // ── Build removed-line widgets ────────────────────────────────────────────────
+// Fixed: properly groups consecutive removed lines and inserts widget
+// before the next added/context line that follows the removal block.
 
-function buildRemovedWidgets(diff: FileDiff | null): DecorationSet {
-    if (!diff || diff.hunks.length === 0) return Decoration.none;
+function buildRemovedWidgets(
+  diff: FileDiff | null,
+  state: import("@codemirror/state").EditorState,
+): DecorationSet {
+  if (!diff || diff.hunks.length === 0) return Decoration.none;
 
-    const widgets: Array<Range<Decoration>> = [];
+  const widgets: Array<Range<Decoration>> = [];
+  const totalLines = state.doc.lines;
 
-    for (const hunk of diff.hunks) {
-        if (hunk.accepted === false) continue;
+  for (const hunk of diff.hunks) {
+    if (hunk.accepted === false) continue;
 
-        // Group consecutive removed lines
-        let removedGroup: string[] = [];
-        let insertAfterNewLine: number | null = null;
+    let removedGroup: string[] = [];
 
-        for (const line of hunk.lines) {
-            if (line.type === "removed") {
-                removedGroup.push(line.content);
-                // Insert widget before the next added/context line
-                const nextAdded = hunk.lines.find(
-                    l => l.type !== "removed" && l.newLineNum != null
-                );
-                if (nextAdded?.newLineNum) {
-                    insertAfterNewLine = nextAdded.newLineNum - 1;
-                }
-            }
-        }
-
-        if (removedGroup.length > 0 && insertAfterNewLine !== null) {
-            // Clamp to valid line number
-            const lineCount = 1; // Will be resolved at render time
+    for (const line of hunk.lines) {
+      if (line.type === "removed") {
+        removedGroup.push(line.content);
+      } else {
+        // Flush group before this non-removed line
+        if (removedGroup.length > 0 && line.newLineNum != null) {
+          const lineNum = line.newLineNum;
+          if (lineNum >= 1 && lineNum <= totalLines) {
+            const from = state.doc.line(lineNum).from;
             widgets.push(
-                Decoration.widget({
-                    widget: new RemovedLinesWidget(removedGroup),
-                    side: -1,  // before the line
-                    block: true,
-                }).range(insertAfterNewLine)
+              Decoration.widget({
+                widget: new RemovedLinesWidget([...removedGroup]),
+                side: -1,
+                block: true,
+              }).range(from),
             );
+          }
+          removedGroup = [];
         }
+      }
     }
 
-    widgets.sort((a, b) => a.from - b.from);
+    // If hunk ends with removed lines (deletion at end of hunk)
+    // Insert widget after the last context/added line before it
+    if (removedGroup.length > 0) {
+      // Find the last added/context line in this hunk
+      const lastNewLine = [...hunk.lines]
+        .reverse()
+        .find((l) => l.type !== "removed" && l.newLineNum != null);
 
-    const builder = new RangeSetBuilder<Decoration>();
-    for (const w of widgets) builder.add(w.from, w.from, w.value);
-    return builder.finish();
+      const insertLine = lastNewLine?.newLineNum ?? hunk.newStart;
+      const lineNum = Math.min(insertLine + 1, totalLines);
+      if (lineNum >= 1 && lineNum <= totalLines) {
+        const from = state.doc.line(lineNum).from;
+        widgets.push(
+          Decoration.widget({
+            widget: new RemovedLinesWidget([...removedGroup]),
+            side: -1,
+            block: true,
+          }).range(from),
+        );
+      }
+      removedGroup = [];
+    }
+  }
+
+  widgets.sort((a, b) => a.from - b.from);
+  const builder = new RangeSetBuilder<Decoration>();
+  for (const w of widgets) builder.add(w.from, w.from, w.value);
+  return builder.finish();
+}
+
+// ── Event handler for hunk actions ───────────────────────────────────────────
+// Listens for clicks on Accept/Reject buttons inside the block widgets.
+
+function buildClickHandler(
+  onAccept: (hunkId: string) => void,
+  onReject: (hunkId: string) => void,
+): Extension {
+  return EditorView.domEventHandlers({
+    click(event, view) {
+      const target = event.target as HTMLElement;
+      const hunkId = target.dataset?.hunkId;
+      const action = target.dataset?.action;
+      if (!hunkId || !action) return false;
+
+      if (action === "accept") {
+        onAccept(hunkId);
+        view.dispatch({ effects: acceptHunkEffect.of(hunkId) });
+      }
+      if (action === "reject") {
+        onReject(hunkId);
+        view.dispatch({ effects: rejectHunkEffect.of(hunkId) });
+      }
+      return true;
+    },
+  });
 }
 
 // ── Theme ─────────────────────────────────────────────────────────────────────
 
 const diffTheme = EditorView.theme({
-    ".cm-diff-added": {
-        backgroundColor: "rgba(63,185,80,0.10) !important",
-        borderLeft: "2px solid #238636",
-    },
-    ".cm-diff-removed": {
-        backgroundColor: "rgba(255,123,114,0.10) !important",
-        borderLeft: "2px solid #da3633",
-        textDecoration: "line-through",
-        opacity: "0.6",
-    },
-    ".cm-diff-gutter": {
-        width: "36px",
-        backgroundColor: "#0d1117",
-        borderRight: "1px solid #21262d",
-    },
-    ".cm-diff-gutter-actions": {
-        cursor: "default",
-    },
+  ".cm-diff-added": {
+    backgroundColor: "#133627 !important",
+    // borderLeft: "2px solid #238636",
+  },
+  ".cm-diff-hunk-header": {
+    display: "block",
+  },
 });
 
 // ── Main export ───────────────────────────────────────────────────────────────
-// Returns the complete extension array to add to CodeMirror.
 
 export function diffDecorationExtension(
-    onAccept: (hunkId: string, filePath: string) => void,
-    onReject: (hunkId: string, filePath: string) => void,
-    filePath: string,
+  onAccept: (hunkId: string, filePath: string) => void,
+  onReject: (hunkId: string, filePath: string) => void,
+  filePath: string,
 ): Extension {
-    return [
-        diffStateField,
-        diffTheme,
-        buildDiffGutter(
-            (hunkId) => onAccept(hunkId, filePath),
-            (hunkId) => onReject(hunkId, filePath),
-        ),
-        // Removed lines as block widgets
-        EditorView.decorations.compute(
-            [diffStateField],
-            state => buildRemovedWidgets(state.field(diffStateField)),
-        ),
-    ];
+  const wrappedAccept = (hunkId: string) => onAccept(hunkId, filePath);
+  const wrappedReject = (hunkId: string) => onReject(hunkId, filePath);
+
+  return [
+    diffStateField,
+    diffTheme,
+
+    // Correct line background highlights
+    EditorView.decorations.compute([diffStateField], (state) =>
+      buildLineDecorations(state.field(diffStateField), state),
+    ),
+
+    // Inline hunk header + accept/reject buttons
+    EditorView.decorations.compute([diffStateField], (state) =>
+      buildHunkHeaderWidgets(
+        state.field(diffStateField),
+        state,
+        wrappedAccept,
+        wrappedReject,
+      ),
+    ),
+
+    // Ghost removed-line widgets
+    EditorView.decorations.compute([diffStateField], (state) =>
+      buildRemovedWidgets(state.field(diffStateField), state),
+    ),
+
+    // Click handler for accept/reject buttons
+    buildClickHandler(wrappedAccept, wrappedReject),
+  ];
 }
