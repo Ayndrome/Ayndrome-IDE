@@ -559,6 +559,7 @@ export type WebToolCallParams = {
     read_file: { filePath: string; startLine?: number; endLine?: number };
     write_file: { filePath: string; content: string };
     create_file: { filePath: string; isFolder?: boolean };
+    create_directory: { dirPath: string };
     delete_file: { filePath: string; recursive?: boolean };
     search_in_file: { filePath: string; query: string; isRegex?: boolean };
     search_files: { query: string; isRegex?: boolean; includePattern?: string };
@@ -581,6 +582,7 @@ export type WebToolResult = {
     read_file: { content: string; totalLines: number; truncated: boolean };
     write_file: { success: boolean; lintErrors?: LintError[] };
     create_file: { success: boolean };
+    create_directory: { success: boolean };
     delete_file: { success: boolean };
     search_in_file: { matchingLines: number[] };
     search_files: { filePaths: string[]; hasMore: boolean };
