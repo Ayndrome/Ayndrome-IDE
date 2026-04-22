@@ -3,32 +3,36 @@ import { HighlightStyle, syntaxHighlighting } from "@codemirror/language";
 import { indentationMarkers } from "@replit/codemirror-indentation-markers";
 import { tags as t } from "@lezer/highlight";
 
-// ── GitHub Dark palette (matches github-vscode-theme) ────────────────────────
-//   https://github.com/primer/github-vscode-theme
+// ── Cursor / VS Code Dark+ palette ───────────────────────────────────────────
+// Matches the default Cursor dark theme exactly (VS Code Dark+ variant).
+// Colors verified against the Cursor screenshot.
 const GH = {
-  bg: "#141414", // editor background
-  bgPanel: "#141414", // gutter, line highlight
-  bgSelection: "#264f7840", // selection
-  border: "#30363d", // dividers
-  fg: "#e6edf3", // default text
-  fgSubtle: "#8b949e", // comments, line numbers
-  fgInactive: "#484f58", // inactive, fold markers
-  string: "#a5d6ff", // strings, template literals
-  stringRe: "#ff7b72", // regex literals (same as keyword)
-  keyword: "#ff7b72", // keywords: import, return, …
-  keyword2: "#f47067", // control: if, for, while
-  constant: "#79c0ff", // numeric, boolean, this, null
-  func: "#d2a8ff", // function names
-  param: "#ffa657", // parameters, variables
-  typeClass: "#ffa657", // type annotations, class names
-  property: "#79c0ff", // object keys / properties
-  punctuation: "#e6edf3", // brackets, commas
-  operator: "#ff7b72", // operators
-  meta: "#e3b341", // decorators, meta
-  invalid: "#f85149", // invalid tokens
-  cursor: "#e6edf3",
-  activeLine: "#161b2260",
-  matchBracket: "#264f78",
+  bg: "#1e1e1e", // editor + gutter background
+  bgPanel: "#1e1e1e", // gutter, active line bg
+  bgSelection: "#264f7880", // selection highlight (blue-ish)
+  border: "#3c3c3c", // gutter border / dividers
+  fg: "#d4d4d4", // default text — warm light gray
+  fgSubtle: "#858585", // line numbers
+  fgInactive: "#4a4a4a", // indent guides, fold markers
+
+  // Syntax
+  string: "#ce9178", // strings — warm orange
+  stringRe: "#d16969", // regex literals — muted red
+  keyword: "#569cd6", // const, let, var, return, new, typeof — blue
+  keyword2: "#c586c0", // import, export, if, for, while, async — purple
+  constant: "#b5cea8", // numbers — mint green
+  func: "#dcdcaa", // function / method names — yellow
+  param: "#9cdcfe", // parameters, local variables, properties — light blue
+  typeClass: "#4ec9b0", // type names, class names — teal
+  property: "#9cdcfe", // object keys / properties — light blue
+  punctuation: "#d4d4d4", // brackets, commas — default
+  operator: "#d4d4d4", // operators
+  meta: "#dcdcaa", // decorators — yellow
+  invalid: "#f44747", // errors
+
+  cursor: "#d4d4d4",
+  activeLine: "#2a2d2e", // subtle active line
+  matchBracket: "#0d3a58", // bracket pair highlight
 } as const;
 
 // ── CodeMirror EditorView theme (UI chrome) ───────────────────────────────────
@@ -61,26 +65,26 @@ export const githubDarkTheme = EditorView.theme(
 
     // Search highlight
     ".cm-searchMatch": {
-      backgroundColor: "#264f7860",
+      backgroundColor: "#613214",
       outline: `1px solid ${GH.border}`,
       borderRadius: "2px",
     },
     ".cm-searchMatch.cm-searchMatch-selected": {
-      backgroundColor: "#264f78a0",
+      backgroundColor: "#264f78",
     },
 
     // Active line
     ".cm-activeLine": { backgroundColor: GH.activeLine },
-    ".cm-selectionMatch": { backgroundColor: "#264f7840" },
+    ".cm-selectionMatch": { backgroundColor: "#3a3d41" },
 
     // Brackets
     "&.cm-focused .cm-matchingBracket": {
       backgroundColor: GH.matchBracket,
-      outline: `1px solid #79c0ff80`,
+      outline: `1px solid #569cd680`,
       borderRadius: "2px",
     },
     "&.cm-focused .cm-nonmatchingBracket": {
-      backgroundColor: "#f8514920",
+      backgroundColor: "#f4474730",
     },
 
     // Gutter
@@ -104,7 +108,7 @@ export const githubDarkTheme = EditorView.theme(
     ".cm-foldPlaceholder": {
       backgroundColor: "transparent",
       border: "none",
-      color: "none",
+      color: GH.fgSubtle,
     },
 
     // Scrollbar
@@ -118,13 +122,13 @@ export const githubDarkTheme = EditorView.theme(
 
     // Tooltip / autocomplete
     ".cm-tooltip": {
-      backgroundColor: "#1c2128",
-      border: `1px solid ${GH.border}`,
-      borderRadius: "6px",
+      backgroundColor: "#252526",
+      border: `1px solid #454545`,
+      borderRadius: "4px",
     },
     ".cm-tooltip-autocomplete": {
       "& > ul > li[aria-selected]": {
-        backgroundColor: "#264f78",
+        backgroundColor: "#04395e",
         color: GH.fg,
       },
     },
@@ -132,51 +136,54 @@ export const githubDarkTheme = EditorView.theme(
   { dark: true },
 );
 
-// ── Syntax highlight rules ─────────────────────────────────────────────────────
+// ── Syntax highlight rules — Cursor / VS Code Dark+ ───────────────────────────
 export const githubDarkHighlight = HighlightStyle.define([
-  // Comments
-  { tag: t.comment, color: GH.fgSubtle, fontStyle: "italic" },
-  { tag: t.lineComment, color: GH.fgSubtle, fontStyle: "italic" },
-  { tag: t.blockComment, color: GH.fgSubtle, fontStyle: "italic" },
-  { tag: t.docComment, color: GH.fgSubtle, fontStyle: "italic" },
+  // Comments — green, italic (like VS Code)
+  { tag: t.comment, color: "#6a9955", fontStyle: "italic" },
+  { tag: t.lineComment, color: "#6a9955", fontStyle: "italic" },
+  { tag: t.blockComment, color: "#6a9955", fontStyle: "italic" },
+  { tag: t.docComment, color: "#6a9955", fontStyle: "italic" },
 
-  // Strings
+  // Strings — warm orange
   { tag: t.string, color: GH.string },
   { tag: t.special(t.string), color: GH.string },
   { tag: t.regexp, color: GH.stringRe },
-  { tag: t.escape, color: GH.constant },
+  { tag: t.escape, color: "#d7ba7d" }, // escape sequences — gold
 
-  // Keywords
-  { tag: t.keyword, color: GH.keyword, fontWeight: "bold" },
-  { tag: t.moduleKeyword, color: GH.keyword },
-  { tag: t.controlKeyword, color: GH.keyword2 },
-  { tag: t.operatorKeyword, color: GH.keyword2 },
+  // Keywords — blue (const, let, var, return, function, new, typeof)
+  { tag: t.keyword, color: GH.keyword },
   { tag: t.definitionKeyword, color: GH.keyword },
   { tag: t.modifier, color: GH.keyword },
+  // Module / control flow — purple (import, export, if, for, while, async, await)
+  { tag: t.moduleKeyword, color: GH.keyword2 },
+  { tag: t.controlKeyword, color: GH.keyword2 },
+  { tag: t.operatorKeyword, color: GH.keyword2 },
 
-  // Names
+  // Identifiers
   { tag: t.name, color: GH.fg },
   { tag: t.variableName, color: GH.fg },
   { tag: t.definition(t.variableName), color: GH.fg },
+  // Function / method names — yellow
   { tag: t.function(t.variableName), color: GH.func },
   { tag: t.definition(t.propertyName), color: GH.func },
+  { tag: t.function(t.propertyName), color: GH.func },
 
-  // Types / Classes
+  // Types / Classes — teal
   { tag: t.typeName, color: GH.typeClass },
   { tag: t.typeOperator, color: GH.keyword },
   { tag: t.className, color: GH.typeClass },
   { tag: t.namespace, color: GH.typeClass },
 
-  // Properties / attributes
+  // Properties / attributes — light blue
   { tag: t.propertyName, color: GH.property },
-  { tag: t.attributeName, color: GH.func },
+  { tag: t.attributeName, color: GH.property },
   { tag: t.attributeValue, color: GH.string },
 
-  // Number / bool / null / this
+  // Numbers — mint green; booleans / null — blue (like VS Code)
   { tag: t.number, color: GH.constant },
-  { tag: t.bool, color: GH.constant, fontWeight: "bold" },
-  { tag: t.null, color: GH.constant },
-  { tag: t.self, color: GH.constant },
+  { tag: t.bool, color: GH.keyword }, // true / false — blue
+  { tag: t.null, color: GH.keyword }, // null / undefined — blue
+  { tag: t.self, color: GH.keyword2 }, // this — purple
 
   // Operators & punctuation
   { tag: t.operator, color: GH.operator },
@@ -185,26 +192,26 @@ export const githubDarkHighlight = HighlightStyle.define([
   { tag: t.separator, color: GH.fgSubtle },
   { tag: t.derefOperator, color: GH.operator },
 
-  // Params
+  // Parameters, local vars — light blue
   { tag: t.special(t.variableName), color: GH.param },
   { tag: t.local(t.variableName), color: GH.param },
 
-  // Meta / decorator
+  // Meta / decorators — yellow
   { tag: t.meta, color: GH.meta },
   { tag: t.processingInstruction, color: GH.meta },
   { tag: t.annotation, color: GH.meta },
 
-  // Markup (HTML/JSX)
-  { tag: t.tagName, color: GH.keyword2 },
+  // Markup (HTML / JSX)
+  { tag: t.tagName, color: GH.keyword2 }, // tag names — purple
   { tag: t.angleBracket, color: GH.fgSubtle },
   { tag: t.content, color: GH.fg },
   { tag: t.heading, color: GH.func, fontWeight: "bold" },
   { tag: t.link, color: GH.string, textDecoration: "underline" },
 
-  // Invalid
+  // Invalid / diff
   { tag: t.invalid, color: GH.invalid },
   { tag: t.deleted, color: GH.invalid },
-  { tag: t.inserted, color: "#3fb950" },
+  { tag: t.inserted, color: "#b5cea8" },
   { tag: t.changed, color: GH.param },
 ]);
 
@@ -215,213 +222,15 @@ export const githubDark = [
 ];
 
 // ── Indentation markers — subtle, theme-matched ───────────────────────────────
-// Uses the palette border color (#30363d) for inactive guides and
-// fgInactive (#484f58) for the guide on the active indentation level.
-// Both are low-contrast so they never compete with syntax highlighting.
+// Inactive guides: barely-visible dark line blending into bg (#1e1e1e → #2a2a2a)
+// Active-block guide: the user's chosen #3b82f6 accent (subtle blue)
 export const githubDarkIndentMarkers = indentationMarkers({
   colors: {
-    light: GH.border, // inactive guide — very subtle
-    dark: GH.border, // same for dark context
-    activeLight: GH.fgInactive, // active-block guide — slightly brighter
-    activeDark: GH.fgInactive,
+    light: "#2a2f36", // inactive guide — very subtle
+    dark: "#2a2f36",
+    activeLight: "#3b82f6", // active-block guide — subtle blue accent
+    activeDark: "#3b82f6",
   },
-  highlightActiveBlock: true, // highlight the current indent block
-  hideFirstIndent: false, // show first-level guides too
+  highlightActiveBlock: true,
+  hideFirstIndent: false,
 });
-
-// src/app/features/ide/extensions/theme.ts
-// Updated palette — same structure, new colors matching the design
-
-// import { EditorView } from "@codemirror/view";
-// import { HighlightStyle, syntaxHighlighting } from "@codemirror/language";
-// import { tags as t } from "@lezer/highlight";
-
-// // ── Ayndrome Dark palette ─────────────────────────────────────────────────────
-// // Warm dark greys base, IntelliJ/JetBrains-inspired syntax colors
-// // that work harmoniously with the #1e1f22 / #2b2d30 shell
-// const P = {
-//     bg: "#141414",   // editor background — matches shell
-//     bgPanel: "#141414",   // gutter, active line
-//     bgSelection: "#214283",   // selection (JetBrains blue-ish)
-//     border: "#3c3f41",   // dividers
-//     fg: "#bcbec4",   // default text
-//     fgSubtle: "#6f737a",   // comments, line numbers
-//     fgInactive: "#4a4d52",   // fold markers, inactive
-
-//     // Syntax — warm, low saturation, JetBrains-inspired
-//     string: "#6a8759",   // strings — muted green
-//     stringRe: "#6a8759",   // regex
-//     keyword: "#cc7832",   // keywords — warm orange
-//     keyword2: "#cc7832",   // control keywords
-//     constant: "#6897bb",   // numbers, booleans — muted blue
-//     func: "#ffc66d",   // function names — warm yellow
-//     param: "#b8b08d",   // parameters — warm sand
-//     typeClass: "#b8b08d",   // types, class names
-//     property: "#9876aa",   // properties — muted purple
-//     punctuation: "#bcbec4",   // brackets, commas
-//     operator: "#bcbec4",   // operators
-//     meta: "#bbb529",   // decorators — muted yellow
-//     invalid: "#c75450",   // errors — muted red
-
-//     cursor: "#bcbec4",
-//     activeLine: "#26282e",
-//     matchBracket: "#214283",
-// } as const;
-
-// export const githubDarkTheme = EditorView.theme(
-//     {
-//         "&": {
-//             color: P.fg,
-//             backgroundColor: P.bg,
-//             height: "100%",
-//             fontSize: "13px",
-//             fontFamily: '"JetBrains Mono", "Cascadia Code", "Fira Code", "Menlo", monospace',
-//         },
-//         ".cm-content": {
-//             caretColor: P.cursor,
-//             padding: "8px 0",
-//         },
-//         ".cm-cursor, .cm-dropCursor": {
-//             borderLeftColor: P.cursor,
-//             borderLeftWidth: "2px",
-//         },
-//         "&.cm-focused .cm-cursor": { borderLeftColor: P.cursor },
-//         "&.cm-focused .cm-selectionBackground, .cm-selectionBackground, ::selection": {
-//             backgroundColor: P.bgSelection,
-//         },
-//         ".cm-panels": { backgroundColor: P.bgPanel, color: P.fg },
-//         ".cm-panels.cm-panels-top": { borderBottom: `1px solid ${P.border}` },
-//         ".cm-panels.cm-panels-bottom": { borderTop: `1px solid ${P.border}` },
-
-//         ".cm-searchMatch": {
-//             backgroundColor: "#214283",
-//             outline: `1px solid ${P.border}`,
-//             borderRadius: "2px",
-//         },
-//         ".cm-searchMatch.cm-searchMatch-selected": {
-//             backgroundColor: "#2145a0",
-//         },
-
-//         ".cm-activeLine": { backgroundColor: P.activeLine },
-//         ".cm-selectionMatch": { backgroundColor: "#21428360" },
-
-//         "&.cm-focused .cm-matchingBracket": {
-//             backgroundColor: P.matchBracket,
-//             outline: `1px solid #6897bb80`,
-//             borderRadius: "2px",
-//         },
-//         "&.cm-focused .cm-nonmatchingBracket": {
-//             backgroundColor: "#c7545020",
-//         },
-
-//         ".cm-gutters": {
-//             backgroundColor: P.bg,
-//             color: P.fgSubtle,
-//             border: "none",
-//             borderRight: `1px solid ${P.border}`,
-//             minWidth: "40px",
-//         },
-//         ".cm-lineNumbers .cm-gutterElement": {
-//             padding: "0 12px 0 8px",
-//             minWidth: "32px",
-//         },
-//         ".cm-activeLineGutter": {
-//             backgroundColor: P.bgPanel,
-//             color: P.fg,
-//         },
-//         ".cm-foldPlaceholder": {
-//             backgroundColor: "transparent",
-//             border: "none",
-//             color: P.fgInactive,
-//         },
-
-//         ".cm-scroller": { overflow: "auto" },
-//         ".cm-scroller::-webkit-scrollbar": { width: "8px", height: "8px" },
-//         ".cm-scroller::-webkit-scrollbar-track": { background: P.bg },
-//         ".cm-scroller::-webkit-scrollbar-thumb": {
-//             background: P.border,
-//             borderRadius: "4px",
-//         },
-
-//         ".cm-tooltip": {
-//             backgroundColor: "#2b2d30",
-//             border: `1px solid ${P.border}`,
-//             borderRadius: "6px",
-//         },
-//         ".cm-tooltip-autocomplete": {
-//             "& > ul > li[aria-selected]": {
-//                 backgroundColor: "#214283",
-//                 color: P.fg,
-//             },
-//         },
-//     },
-//     { dark: true }
-// );
-
-// export const githubDarkHighlight = HighlightStyle.define([
-//     { tag: t.comment, color: P.fgSubtle, fontStyle: "italic" },
-//     { tag: t.lineComment, color: P.fgSubtle, fontStyle: "italic" },
-//     { tag: t.blockComment, color: P.fgSubtle, fontStyle: "italic" },
-//     { tag: t.docComment, color: P.fgSubtle, fontStyle: "italic" },
-
-//     { tag: t.string, color: P.string },
-//     { tag: t.special(t.string), color: P.string },
-//     { tag: t.regexp, color: P.stringRe },
-//     { tag: t.escape, color: P.constant },
-
-//     { tag: t.keyword, color: P.keyword, fontWeight: "bold" },
-//     { tag: t.moduleKeyword, color: P.keyword },
-//     { tag: t.controlKeyword, color: P.keyword2 },
-//     { tag: t.operatorKeyword, color: P.keyword2 },
-//     { tag: t.definitionKeyword, color: P.keyword },
-//     { tag: t.modifier, color: P.keyword },
-
-//     { tag: t.name, color: P.fg },
-//     { tag: t.variableName, color: P.fg },
-//     { tag: t.definition(t.variableName), color: P.fg },
-//     { tag: t.function(t.variableName), color: P.func },
-//     { tag: t.definition(t.propertyName), color: P.func },
-
-//     { tag: t.typeName, color: P.typeClass },
-//     { tag: t.typeOperator, color: P.keyword },
-//     { tag: t.className, color: P.typeClass },
-//     { tag: t.namespace, color: P.typeClass },
-
-//     { tag: t.propertyName, color: P.property },
-//     { tag: t.attributeName, color: P.func },
-//     { tag: t.attributeValue, color: P.string },
-
-//     { tag: t.number, color: P.constant },
-//     { tag: t.bool, color: P.constant, fontWeight: "bold" },
-//     { tag: t.null, color: P.constant },
-//     { tag: t.self, color: P.constant },
-
-//     { tag: t.operator, color: P.operator },
-//     { tag: t.punctuation, color: P.punctuation },
-//     { tag: t.bracket, color: P.punctuation },
-//     { tag: t.separator, color: P.fgSubtle },
-//     { tag: t.derefOperator, color: P.operator },
-
-//     { tag: t.special(t.variableName), color: P.param },
-//     { tag: t.local(t.variableName), color: P.param },
-
-//     { tag: t.meta, color: P.meta },
-//     { tag: t.processingInstruction, color: P.meta },
-//     { tag: t.annotation, color: P.meta },
-
-//     { tag: t.tagName, color: P.keyword2 },
-//     { tag: t.angleBracket, color: P.fgSubtle },
-//     { tag: t.content, color: P.fg },
-//     { tag: t.heading, color: P.func, fontWeight: "bold" },
-//     { tag: t.link, color: P.string, textDecoration: "underline" },
-
-//     { tag: t.invalid, color: P.invalid },
-//     { tag: t.deleted, color: P.invalid },
-//     { tag: t.inserted, color: "#59a869" },
-//     { tag: t.changed, color: P.param },
-// ]);
-
-// export const githubDark = [
-//     githubDarkTheme,
-//     syntaxHighlighting(githubDarkHighlight),
-// ];
