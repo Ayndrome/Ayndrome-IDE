@@ -28,7 +28,7 @@
 
 ## 📸 Preview
 
-> Screenshots and demo recordings coming soon — have some to share? Open a PR!
+> Screenshots and demo recordings — have some to share? Open a PR!
 
 <!-- Add your screenshots below — drag and drop images into your PR -->
 <div align="center">
