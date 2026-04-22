@@ -289,11 +289,17 @@ import { cleanupIdleSessions }
     from "./src/server/sandbox/persistent-terminal-manager";
 import { cleanupIdleSessions as cleanupPlaywrightSessions, shutdown as shutdownPlaywright }
     from "./src/server/playwright/playwright-manager";
+
+import { warmupTokenizer } from "./src/lib/token/token-utils";
+
+
 const dev = process.env.NODE_ENV !== "production";
 const port = parseInt(process.env.PORT ?? "3000", 10);
 
 async function main() {
     console.log(`\n🚀 Starting Ayndrome IDE Server (${dev ? "dev" : "prod"})\n`);
+
+    warmupTokenizer();
 
     await verifyDocker();
 

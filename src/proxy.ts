@@ -20,6 +20,7 @@ const isPublicRoute = createRouteMatcher([
   "/sign-in(.*)",
   "/sign-up(.*)",
   "/api/files/watch(.*)",
+  "/api/llm-proxy(.*)", // Essential to prevent CORS error on LLM calls (redirects)
 ]);
 
 // Next.js 16+ uses "proxy" as the export name
