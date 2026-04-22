@@ -913,7 +913,7 @@ const FileTreeNode: React.FC<FileTreeNodeProps> = ({
                                 style={{ paddingLeft: `${(depth + 1) * 12 + 20}px` }}
                                 className="text-[10px] text-muted-foreground/50 py-1"
                             >
-                                Loader
+                                <Spinner/>
                             </div>
                         )}
                         {children?.map(child => (
@@ -1288,16 +1288,16 @@ export const FileExplorer: React.FC<FileExplorerProps> = React.memo(({
                 </ScrollArea>
 
                 {/* Status bar */}
-                <div
+                {/* <div
                     className="px-3 py-1 border-t shrink-0"
                     style={{ borderColor: "#3c3f41", backgroundColor: "#1e1f22" }}
                 >
                     <p className="text-[10px] truncate" style={{ color: "#6f737a" }}>
                         {rootContents !== undefined
-                            ? `${rootContents.length} item${rootContents.length !== 1 ? "s" : ""} · Right-click for actions`
+                            ? `${rootContents.length} item${rootContents.length !== 1 ? "s" : ""}`
                             : "…"}
                     </p>
-                </div>
+                </div> */}
             </div>
         </>
     );
