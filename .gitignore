@@ -33,8 +33,11 @@ yarn-debug.log*
 yarn-error.log*
 .pnpm-debug.log*
 
-# env files (can opt-in for committing if needed)
-# .env*
+# env files — never commit secrets
+.env
+.env.*
+.env.local
+.env*.local
 
 # vercel
 .vercel
@@ -42,3 +45,10 @@ yarn-error.log*
 # typescript
 *.tsbuildinfo
 next-env.d.ts
+
+# dev-only local files — not for remote
+error.md
+Backlog.md
+Priority.md
+workspace-registry.json
+rules.md
