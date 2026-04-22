@@ -1,35 +1,104 @@
 <div align="center">
 
-# Ayndrome IDE
+<br/>
 
-**A modern, AI-native code editor built for the browser.**  
-Write, review, and ship code with an embedded AI agent that reads, edits, and explains your codebase — right inside the editor.
+<img src="https://capsule-render.vercel.app/api?type=waving&color=6e40c9&height=200&section=header&text=Ayndrome%20IDE&fontSize=60&fontColor=ffffff&fontAlignY=38&desc=AI-native%20code%20editor%20built%20for%20the%20browser&descAlignY=60&descColor=c9b8ff" width="100%"/>
 
-![Next.js](https://img.shields.io/badge/Next.js-15-black?logo=nextdotjs)
-![TypeScript](https://img.shields.io/badge/TypeScript-5-blue?logo=typescript)
-![CodeMirror](https://img.shields.io/badge/CodeMirror-6-orange)
-![License](https://img.shields.io/badge/license-MIT-green)
+<br/>
+
+<p>
+  <a href="https://github.com/Ayndrome/Ayndrome-IDE/stargazers"><img src="https://img.shields.io/github/stars/Ayndrome/Ayndrome-IDE?style=for-the-badge&logo=starship&color=6e40c9&labelColor=0d1117" alt="Stars"/></a>
+  &nbsp;
+  <a href="https://github.com/Ayndrome/Ayndrome-IDE/commits/main"><img src="https://img.shields.io/github/last-commit/Ayndrome/Ayndrome-IDE?style=for-the-badge&logo=github&color=238636&labelColor=0d1117" alt="Last Commit"/></a>
+  &nbsp;
+  <a href="https://github.com/Ayndrome/Ayndrome-IDE/blob/main/LICENSE"><img src="https://img.shields.io/badge/License-MIT-blue?style=for-the-badge&labelColor=0d1117" alt="License"/></a>
+  &nbsp;
+  <img src="https://img.shields.io/badge/TypeScript-5.0-3178c6?style=for-the-badge&logo=typescript&logoColor=white&labelColor=0d1117" alt="TypeScript"/>
+</p>
+
+<br/>
+
+> **Write, review, and ship code — with an AI agent that reads, edits, and explains your codebase right inside the editor.**
+
+<br/>
 
 </div>
 
 ---
 
-## ✨ What is Ayndrome IDE?
+## 📸 Preview
 
-Ayndrome IDE is a web-based code editor with a built-in AI chat agent. Unlike traditional AI coding assistants that live in a sidebar, the agent here has **direct access to your workspace** — it can read files, write changes, run terminal commands, and search your codebase. Every edit appears in the editor with a diff view you can accept or reject hunk-by-hunk.
+> Screenshots and demo recordings coming soon — have some to share? Open a PR!
 
-### Core Features
+<!-- Add your screenshots below — drag and drop images into your PR -->
+<!--
+<div align="center">
+  <img src=".github/assets/screenshot-chat.png" width="49%" />
+  <img src=".github/assets/screenshot-diff.png" width="49%" />
+</div>
 
-| Feature              | Description                                                          |
-| -------------------- | -------------------------------------------------------------------- |
-| 🤖 **AI Agent**      | Multi-step agent loop with tool use (read/write/search/terminal)     |
-| 📝 **Code Editor**   | CodeMirror 6 with syntax highlighting, LSP, indentation markers      |
-| 🔍 **Diff Review**   | Per-hunk accept/reject with Myers diff algorithm                     |
-| 🧠 **Multi-Model**   | Switch between Claude, GPT-4, Gemini, and OpenRouter models          |
-| 💬 **Chat UI**       | Collapsible tool cards, streaming responses, file mentions (`@file`) |
-| 📁 **File Explorer** | Browse and open workspace files inline                               |
-| 🖥️ **Terminal**      | Sandboxed terminal execution via the agent                           |
-| 🔌 **LSP**           | TypeScript and Python language server support                        |
+<div align="center">
+  <img src=".github/assets/demo-agent.gif" width="98%" />
+</div>
+-->
+
+---
+
+## ✦ Features
+
+<table>
+<tr>
+<td width="50%">
+
+**🤖 AI Agent Loop**
+Multi-step agent with full tool access — reads files, writes edits, searches code, runs terminal commands, and self-corrects on lint errors.
+
+**📝 CodeMirror 6 Editor**
+Syntax highlighting, LSP (TypeScript + Python), indentation markers, minimap, and streaming write support.
+
+**� Diff Review UI**
+Per-hunk accept/reject powered by the Myers diff algorithm. Every agent edit shows exactly which lines changed.
+
+</td>
+<td width="50%">
+
+**🧠 Multi-Model Support**
+Switch between Claude, GPT-4o, Gemini, and any OpenRouter model without leaving the editor.
+
+**💬 Contextual Chat**
+Mention files with `@filename`, collapsible tool cards, streaming responses, and checkpoint history.
+
+**🖥️ Sandboxed Terminal**
+Run shell commands inside a Docker sandbox — safe, isolated, and visible in chat.
+
+</td>
+</tr>
+</table>
+
+---
+
+## � Tech Stack
+
+<div align="center">
+<br/>
+
+[![My Skills](https://skillicons.dev/icons?i=nextjs,ts,react,tailwind,vercel&theme=dark)](https://skillicons.dev)
+
+<br/>
+
+| Layer     | Technology                     |
+| --------- | ------------------------------ |
+| Framework | Next.js 15 (App Router)        |
+| Language  | TypeScript 5                   |
+| Editor    | CodeMirror 6                   |
+| Database  | Convex                         |
+| Auth      | Clerk                          |
+| State     | Zustand                        |
+| AI SDK    | Vercel AI SDK                  |
+| Diff      | Myers algorithm via `diff` lib |
+| Styling   | Tailwind CSS + shadcn/ui       |
+
+</div>
 
 ---
 
@@ -37,170 +106,138 @@ Ayndrome IDE is a web-based code editor with a built-in AI chat agent. Unlike tr
 
 ### Prerequisites
 
-- **Node.js** 18+
-- **npm** or **yarn**
-- A [Convex](https://convex.dev) project (for database + auth)
-- API keys for your chosen LLM provider
+- Node.js 18+
+- A [Convex](https://convex.dev) project
+- API key(s) for at least one LLM provider
 
-### 1. Clone the repo
+### 1 — Clone
 
 ```bash
 git clone https://github.com/Ayndrome/Ayndrome-IDE.git
 cd Ayndrome-IDE/ayndrome_ide
-```
-
-### 2. Install dependencies
-
-```bash
 npm install
 ```
 
-### 3. Configure environment variables
+### 2 — Environment variables
 
-Create a `.env.local` file in the project root:
+Create `.env.local` in the project root:
 
 ```env
 # Convex
 NEXT_PUBLIC_CONVEX_URL=https://your-project.convex.cloud
 
-# Authentication (Clerk)
+# Auth (Clerk)
 NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY=pk_...
 CLERK_SECRET_KEY=sk_...
 
-# LLM Providers (add whichever you use)
+# LLM — add whichever providers you use
 ANTHROPIC_API_KEY=sk-ant-...
 OPENAI_API_KEY=sk-...
 GOOGLE_GENERATIVE_AI_API_KEY=...
 OPENROUTER_API_KEY=sk-or-...
 ```
 
-### 4. Set up Convex
+### 3 — Convex
 
 ```bash
 npx convex dev
 ```
 
-### 5. Run the development server
+### 4 — Run
 
 ```bash
-# Start Next.js + the local AI proxy server together
 npm run dev
 ```
 
-Open [http://localhost:3000](http://localhost:3000) in your browser.
+Open [http://localhost:3000](http://localhost:3000)
 
 ---
 
-## 🗂️ Project Structure
+## � Project Structure
+
+<details>
+<summary>Click to expand</summary>
 
 ```
 ayndrome_ide/
 ├── src/
 │   ├── app/
-│   │   ├── api/                    # Next.js API routes (files, auth)
-│   │   ├── features/
-│   │   │   └── ide/
-│   │   │       ├── components/     # CodeEditor, FileExplorer, TabManager
-│   │   │       └── extensions/
-│   │   │           ├── chat/       # AI agent, ChatThreadService, ToolCard
-│   │   │           │   └── agent/  # diff-engine, task-tracker, workspace-state
-│   │   │           └── editor/     # diff-decoration, LSP, streaming-writer
-│   │   └── settings/               # Model + provider settings page
+│   │   ├── api/                     # Next.js API routes (files, auth)
+│   │   ├── features/ide/
+│   │   │   ├── components/          # CodeEditor, FileExplorer, TabManager
+│   │   │   └── extensions/
+│   │   │       ├── chat/            # ChatThreadService, ToolCard, DiffViewer
+│   │   │       │   └── agent/       # diff-engine, task-tracker, workspace-state
+│   │   │       └── editor/          # diff-decoration, LSP, streaming-writer
+│   │   └── settings/                # Model & provider settings
 │   ├── lib/
-│   │   ├── model-provider/         # Model router and provider registry
-│   │   └── token/                  # Token counting utilities
+│   │   ├── model-provider/          # Model router + provider registry
+│   │   └── token/                   # Token counting utilities
 │   ├── server/
-│   │   ├── lsp/                    # LSP manager and WebSocket server
-│   │   └── sandbox/                # Terminal sandbox manager
-│   └── store/                      # Zustand stores (editor, diff, chat, IDE)
-├── convex/                         # Convex schema, queries, mutations
-├── server.ts                       # Express proxy server for LLM API calls
-└── src/proxy.ts                    # CORS bypass proxy for browser→LLM
+│   │   ├── lsp/                     # LSP manager + WebSocket server
+│   │   └── sandbox/                 # Docker terminal sandbox
+│   └── store/                       # Zustand: editor, diff, chat, IDE state
+├── convex/                          # Schema, queries, mutations
+└── server.ts                        # Express proxy for LLM API calls
+```
+
+</details>
+
+---
+
+## ⚙️ How the Agent Works
+
+```
+User message
+     │
+     ▼
+ChatThreadService
+  ├─ Builds workspace context (open files + token budget)
+  ├─ Sends to LLM → streams response
+  │
+  ├─ LLM calls a tool?
+  │   ├─ read_file   → reads from workspace
+  │   ├─ write_file  → Myers diff → decorates editor → accept/reject UI
+  │   ├─ run_terminal → executes in Docker sandbox
+  │   └─ search_*   → searches files or content
+  │
+  └─ Loop until done or step limit reached
 ```
 
 ---
 
-## 🧩 How the AI Agent Works
+## � Scripts
 
-1. **User sends a message** in the chat panel
-2. **ChatThreadService** builds a context block (open files, workspace state) and sends it to the LLM
-3. **LLM responds** with text and/or tool calls (`read_file`, `write_file`, `run_terminal`, etc.)
-4. **Tool implementations** execute the calls against the workspace
-5. For `write_file`: the Myers diff engine computes `+added/-removed` lines, injects diff decorations into the CodeMirror editor, and shows an accept/reject UI
-6. **Loop continues** until the task is done or the step limit is reached
-
----
-
-## 🛠️ Available Scripts
-
-| Script               | Description                          |
-| -------------------- | ------------------------------------ |
-| `npm run dev`        | Start Next.js dev server + LLM proxy |
-| `npm run dev:server` | Start only the Express proxy server  |
-| `npm run build`      | Build for production                 |
-| `npm run start`      | Start production server              |
-| `npm run lint`       | Run ESLint                           |
-| `npm test`           | Run Jest unit tests                  |
+| Command              | Description                    |
+| -------------------- | ------------------------------ |
+| `npm run dev`        | Next.js dev server + LLM proxy |
+| `npm run dev:server` | LLM proxy only                 |
+| `npm run build`      | Production build               |
+| `npm run lint`       | ESLint                         |
+| `npm test`           | Jest unit tests                |
 
 ---
 
 ## 🤝 Contributing
 
-Contributions are welcome! Here's how to get started:
+1. **Fork** the repo
+2. Create a branch: `git checkout -b feat/your-feature`
+3. Commit using [Conventional Commits](https://www.conventionalcommits.org):
+   ```
+   feat(scope): what you added
+   fix(scope): what you fixed
+   docs: what you documented
+   ```
+4. Open a **Pull Request** against `main`
 
-### 1. Fork and Clone
-
-```bash
-git clone https://github.com/YOUR_USERNAME/Ayndrome-IDE.git
-cd Ayndrome-IDE/ayndrome_ide
-npm install
-```
-
-### 2. Pick something to work on
-
-- Check open issues for bugs or feature requests
-- Look for `good first issue` labels
-
-### 3. Branch and commit
-
-```bash
-git checkout -b feat/your-feature-name
-# Make your changes
-git commit -m "feat(scope): short description of what you did"
-```
-
-Use [Conventional Commits](https://www.conventionalcommits.org/):
-
-- `feat` – new feature
-- `fix` – bug fix
-- `refactor` – code restructure
-- `style` – visual/CSS change
-- `docs` – documentation
-- `test` – tests
-- `chore` – config/tooling
-
-### 4. Open a Pull Request
-
-Push your branch and open a PR against `main`. Describe what you changed and why.
+All contributions welcome — from typo fixes to new features.
 
 ---
 
-## 🏗️ Tech Stack
+<div align="center">
 
-| Layer     | Technology                                                   |
-| --------- | ------------------------------------------------------------ |
-| Framework | [Next.js 15](https://nextjs.org) (App Router)                |
-| Language  | TypeScript 5                                                 |
-| Editor    | [CodeMirror 6](https://codemirror.net)                       |
-| Database  | [Convex](https://convex.dev)                                 |
-| Auth      | [Clerk](https://clerk.com)                                   |
-| State     | [Zustand](https://zustand-demo.pmnd.rs)                      |
-| AI SDK    | [Vercel AI SDK](https://sdk.vercel.ai)                       |
-| Diff      | [diff](https://github.com/kpdecker/jsdiff) (Myers algorithm) |
-| Styling   | Tailwind CSS + shadcn/ui                                     |
+<img src="https://capsule-render.vercel.app/api?type=waving&color=6e40c9&height=100&section=footer" width="100%"/>
 
----
+**Built with ♥ by [Ayndrome](https://github.com/Ayndrome)**
 
-## 📄 License
-
-MIT © [Ayndrome](https://github.com/Ayndrome)
+</div>
