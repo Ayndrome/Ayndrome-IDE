@@ -7,8 +7,8 @@ import { tags as t } from "@lezer/highlight";
 // Matches the default Cursor dark theme exactly (VS Code Dark+ variant).
 // Colors verified against the Cursor screenshot.
 const GH = {
-  bg: "#1e1e1e", // editor + gutter background
-  bgPanel: "#1e1e1e", // gutter, active line bg
+  bg: "#181818", // editor + gutter background
+  bgPanel: "#181818", // gutter, active line bg
   bgSelection: "#264f7880", // selection highlight (blue-ish)
   border: "#3c3c3c", // gutter border / dividers
   fg: "#d4d4d4", // default text — warm light gray
@@ -226,10 +226,10 @@ export const githubDark = [
 // Active-block guide: the user's chosen #3b82f6 accent (subtle blue)
 export const githubDarkIndentMarkers = indentationMarkers({
   colors: {
-    light: "#2a2f36", // inactive guide — very subtle
-    dark: "#2a2f36",
-    activeLight: "#3b82f6", // active-block guide — subtle blue accent
-    activeDark: "#3b82f6",
+    light: "#343a40", // inactive guide — very subtle
+    dark: "#343a40", // inactive guide — very subtle
+    activeLight: "#343a40", // active-block guide — subtle blue accent
+    activeDark: "#343a40",
   },
   highlightActiveBlock: true,
   hideFirstIndent: false,
