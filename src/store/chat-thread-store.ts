@@ -31,7 +31,6 @@
 
 // import { loadAllThreads, saveThread, deleteThreadFromStorage, runChatAgent, AgentCallbacks, restoreFileSnapshot } from "../app/features/ide/extensions/chat/ChatThreadService";
 
-
 // // ── Store shape ───────────────────────────────────────────────────────────────
 
 // export type ChatStore = {
@@ -809,7 +808,6 @@
 //         .join("\n");
 // }
 
-
 // src/store/chat-thread-store.ts
 // Fixed: workspaceId threaded through all saveThread calls,
 // ThreadStreamState shapes include workspaceId,
@@ -819,846 +817,938 @@ import { create } from "zustand";
 import { subscribeWithSelector } from "zustand/middleware";
 import { toast } from "sonner";
 import {
-    ChatThread,
-    ChatMessage,
-    ThreadStreamState,
-    StagingSelection,
-    CodespanLink,
-    CheckpointEntry,
-    ToolMessage,
-    WebToolName,
-    newThread,
-    isCheckpoint,
-    isToolMessage,
+  ChatThread,
+  ChatMessage,
+  ThreadStreamState,
+  StagingSelection,
+  CodespanLink,
+  CheckpointEntry,
+  ToolMessage,
+  WebToolName,
+  newThread,
+  isCheckpoint,
+  isToolMessage,
 } from "../app/features/ide/extensions/chat/types/types";
 import {
-    loadAllThreads,
-    saveThread,
-    deleteThreadFromStorage,
-    runChatAgent,
-    AgentCallbacks,
-    restoreFileSnapshot,
-    initChatStorage,
-    setAgentWorkspace,
+  loadAllThreads,
+  saveThread,
+  deleteThreadFromStorage,
+  runChatAgent,
+  AgentCallbacks,
+  restoreFileSnapshot,
+  initChatStorage,
+  setAgentWorkspace,
 } from "../app/features/ide/extensions/chat/ChatThreadService";
 import { AgentPlan } from "../app/features/ide/extensions/chat/types/plan-types";
 
 // ── Store shape ───────────────────────────────────────────────────────────────
 
 export type ChatStore = {
-    // ── Persisted ─────────────────────────────────────────────────────────────
-    threads: Record<string, ChatThread | undefined>;
-    currentThreadId: string;
+  // ── Persisted ─────────────────────────────────────────────────────────────
+  threads: Record<string, ChatThread | undefined>;
+  currentThreadId: string;
 
-    // ── Runtime ───────────────────────────────────────────────────────────────
-    streamState: Record<string, ThreadStreamState>;
-    isLoaded: boolean;
+  // ── Runtime ───────────────────────────────────────────────────────────────
+  streamState: Record<string, ThreadStreamState>;
+  isLoaded: boolean;
 
-    // ── Workspace context ──────────────────────────────────────────────────────
-    // Set once when IDE mounts — used by saveThread + agent tools
-    workspaceId: string;
+  // ── Workspace context ──────────────────────────────────────────────────────
+  // Set once when IDE mounts — used by saveThread + agent tools
+  workspaceId: string;
 
-    // ── Settings ───────────────────────────────────────────────────────────────
-    chatMode: "normal" | "gather" | "agent";
-    autoApproveEdits: boolean;
-    autoApproveTerminal: boolean;
+  // ── Settings ───────────────────────────────────────────────────────────────
+  chatMode: "normal" | "gather" | "agent";
+  autoApproveEdits: boolean;
+  autoApproveTerminal: boolean;
 
-    // ── Plan Mode ──────────────────────────────────────────────────────────────
-    planMode: boolean;
-    currentPlanByThread: Record<string, AgentPlan | undefined>;
+  // ── Plan Mode ──────────────────────────────────────────────────────────────
+  planMode: boolean;
+  currentPlanByThread: Record<string, AgentPlan | undefined>;
 
+  // ── Actions ────────────────────────────────────────────────────────────────
 
-    // ── Actions ────────────────────────────────────────────────────────────────
+  initialize: (convexClient: any, workspaceId: string) => Promise<void>;
 
-    initialize: (convexClient: any, workspaceId: string) => Promise<void>;
+  openNewThread: () => void;
+  switchToThread: (threadId: string) => void;
+  deleteThread: (threadId: string) => void;
+  duplicateThread: (threadId: string) => void;
 
-    openNewThread: () => void;
-    switchToThread: (threadId: string) => void;
-    deleteThread: (threadId: string) => void;
-    duplicateThread: (threadId: string) => void;
+  addUserMessageAndStreamResponse: (opts: {
+    userMessage: string;
+    threadId: string;
+    attachments?: StagingSelection[];
+  }) => Promise<void>;
 
-    addUserMessageAndStreamResponse: (opts: {
-        userMessage: string;
-        threadId: string;
-        attachments?: StagingSelection[];
-    }) => Promise<void>;
+  editUserMessageAndStreamResponse: (opts: {
+    userMessage: string;
+    messageIdx: number;
+    threadId: string;
+  }) => Promise<void>;
 
-    editUserMessageAndStreamResponse: (opts: {
-        userMessage: string;
-        messageIdx: number;
-        threadId: string;
-    }) => Promise<void>;
+  approveLatestToolRequest: (threadId: string) => void;
+  rejectLatestToolRequest: (threadId: string) => void;
 
-    approveLatestToolRequest: (threadId: string) => void;
-    rejectLatestToolRequest: (threadId: string) => void;
+  abortRunning: (threadId: string) => Promise<void>;
+  dismissStreamError: (threadId: string) => void;
 
-    abortRunning: (threadId: string) => Promise<void>;
-    dismissStreamError: (threadId: string) => void;
+  addStagingSelection: (selection: StagingSelection) => void;
+  removeStagingSelection: (index: number) => void;
+  clearStagingSelections: () => void;
 
-    addStagingSelection: (selection: StagingSelection) => void;
-    removeStagingSelection: (index: number) => void;
-    clearStagingSelections: () => void;
+  setFocusedMessageIdx: (messageIdx: number | undefined) => void;
+  getFocusedMessageIdx: () => number | undefined;
 
-    setFocusedMessageIdx: (messageIdx: number | undefined) => void;
-    getFocusedMessageIdx: () => number | undefined;
+  getCodespanLink: (opts: {
+    codespanStr: string;
+    messageIdx: number;
+    threadId: string;
+  }) => CodespanLink | undefined;
+  addCodespanLink: (opts: {
+    text: string;
+    link: CodespanLink;
+    messageIdx: number;
+    threadId: string;
+  }) => void;
 
-    getCodespanLink: (opts: { codespanStr: string; messageIdx: number; threadId: string }) => CodespanLink | undefined;
-    addCodespanLink: (opts: { text: string; link: CodespanLink; messageIdx: number; threadId: string }) => void;
+  jumpToCheckpointBeforeMessageIdx: (opts: {
+    threadId: string;
+    messageIdx: number;
+    includeUserModifications: boolean;
+  }) => void;
 
-    jumpToCheckpointBeforeMessageIdx: (opts: {
-        threadId: string;
-        messageIdx: number;
-        includeUserModifications: boolean;
-    }) => void;
+  setChatMode: (mode: "normal" | "gather" | "agent") => void;
+  setAutoApprove: (type: "edits" | "terminal", value: boolean) => void;
 
-    setChatMode: (mode: "normal" | "gather" | "agent") => void;
-    setAutoApprove: (type: "edits" | "terminal", value: boolean) => void;
+  // ── Internals ──────────────────────────────────────────────────────────────
+  _setStreamState: (threadId: string, state: ThreadStreamState) => void;
+  _addMessageToThread: (threadId: string, message: ChatMessage) => void;
+  _replaceLastMessage: (threadId: string, message: ChatMessage) => boolean;
+  _addCheckpoint: (threadId: string, checkpoint: CheckpointEntry) => void;
+  _saveThread: (threadId: string) => void;
+  _getCurrentThread: () => ChatThread | undefined;
+  _setThreadState: (
+    threadId: string,
+    partial:
+      | Partial<ChatThread>
+      | { messages?: ChatMessage[]; state?: ChatThread["state"] },
+  ) => void;
+  _setMessageState: (
+    threadId: string,
+    messageIdx: number,
+    partial: Partial<{
+      stagingSelections: StagingSelection[];
+      isBeingEdited: boolean;
+    }>,
+  ) => void;
 
-    // ── Internals ──────────────────────────────────────────────────────────────
-    _setStreamState: (threadId: string, state: ThreadStreamState) => void;
-    _addMessageToThread: (threadId: string, message: ChatMessage) => void;
-    _replaceLastMessage: (threadId: string, message: ChatMessage) => boolean;
-    _addCheckpoint: (threadId: string, checkpoint: CheckpointEntry) => void;
-    _saveThread: (threadId: string) => void;
-    _getCurrentThread: () => ChatThread | undefined;
-    _setThreadState: (threadId: string, partial: Partial<ChatThread> | { messages?: ChatMessage[]; state?: ChatThread["state"] }) => void;
-    _setMessageState: (threadId: string, messageIdx: number, partial: Partial<{ stagingSelections: StagingSelection[]; isBeingEdited: boolean }>) => void;
-
-    // ── Plan Mode Actions ──────────────────────────────────────────────────────────────
-    setPlanMode: (planMode: boolean) => void;
-    _addPlan: (threadId: string, Plan: AgentPlan) => void;
-    _updatePlan: (threadId: string, Plan: AgentPlan) => void;
+  // ── Plan Mode Actions ──────────────────────────────────────────────────────────────
+  setPlanMode: (planMode: boolean) => void;
+  _addPlan: (threadId: string, Plan: AgentPlan) => void;
+  _updatePlan: (threadId: string, Plan: AgentPlan) => void;
 };
 
 // ── Store ─────────────────────────────────────────────────────────────────────
 
 export const useChatStore = create<ChatStore>()(
-    subscribeWithSelector((set, get) => ({
-        threads: {},
-        currentThreadId: "",
-        streamState: {},
-        isLoaded: false,
-        workspaceId: "",
-        chatMode: "agent",
-        autoApproveEdits: false,
-        autoApproveTerminal: false,
-        planMode: false,
-        currentPlanByThread: {},
+  subscribeWithSelector((set, get) => ({
+    threads: {},
+    currentThreadId: "",
+    streamState: {},
+    isLoaded: false,
+    workspaceId: "",
+    chatMode: "agent",
+    autoApproveEdits: false,
+    autoApproveTerminal: false,
+    planMode: false,
+    currentPlanByThread: {},
 
-        // ── Initialize ────────────────────────────────────────────────────────
-        // Called from IDEWorkspace on mount with the Convex client + workspaceId.
-        // Sets workspace context for agent tools + loads persisted threads.
+    // ── Initialize ────────────────────────────────────────────────────────
+    // Called from IDEWorkspace on mount with the Convex client + workspaceId.
+    // Sets workspace context for agent tools + loads persisted threads.
 
-        initialize: async (convexClient, workspaceId) => {
-            // Wire Convex client into storage layer
-            initChatStorage(convexClient);
+    initialize: async (convexClient, workspaceId) => {
+      // Wire Convex client into storage layer
+      initChatStorage(convexClient);
 
-            // Wire workspaceId into agent tool layer
-            setAgentWorkspace(workspaceId);
+      // Wire workspaceId into agent tool layer
+      setAgentWorkspace(workspaceId);
 
-            // Store workspaceId in Zustand so all saveThread calls can use it
-            set({ workspaceId });
+      // Store workspaceId in Zustand so all saveThread calls can use it
+      set({ workspaceId });
 
-            // Load threads scoped to this workspace
-            const threads = await loadAllThreads(workspaceId);
+      // Load threads scoped to this workspace
+      const threads = await loadAllThreads(workspaceId);
 
-            let currentThreadId = Object.keys(threads)[0] ?? "";
+      let currentThreadId = Object.keys(threads)[0] ?? "";
 
-            if (!currentThreadId) {
-                const first = newThread(crypto.randomUUID());
-                threads[first.id] = first;
-                currentThreadId = first.id;
-            }
+      if (!currentThreadId) {
+        const first = newThread(crypto.randomUUID());
+        threads[first.id] = first;
+        currentThreadId = first.id;
+      }
 
-            // Recover orphaned running_now tool states (app closed mid-execution)
-            for (const thread of Object.values(threads)) {
-                if (!thread) continue;
-                const lastMsg = thread.messages[thread.messages.length - 1];
-                if (lastMsg?.role === "tool" && lastMsg.type === "running_now") {
-                    thread.messages[thread.messages.length - 1] = {
-                        ...lastMsg,
-                        type: "rejected",
-                        content: "Tool was interrupted when the app restarted.",
-                        result: null,
-                    } as ToolMessage<WebToolName>;
-                }
-            }
+      // Recover orphaned running_now tool states (app closed mid-execution)
+      for (const thread of Object.values(threads)) {
+        if (!thread) continue;
+        const lastMsg = thread.messages[thread.messages.length - 1];
+        if (lastMsg?.role === "tool" && lastMsg.type === "running_now") {
+          thread.messages[thread.messages.length - 1] = {
+            ...lastMsg,
+            type: "rejected",
+            content: "Tool was interrupted when the app restarted.",
+            result: null,
+          } as ToolMessage<WebToolName>;
+        }
+      }
 
-            set({ threads, currentThreadId, isLoaded: true });
+      set({ threads, currentThreadId, isLoaded: true });
+    },
+
+    // ── Thread management ──────────────────────────────────────────────────
+
+    openNewThread: () => {
+      const { threads } = get();
+      for (const [id, thread] of Object.entries(threads)) {
+        if (thread && thread.messages.length === 0) {
+          set({ currentThreadId: id });
+          return;
+        }
+      }
+      const thread = newThread(crypto.randomUUID());
+      set((s) => ({
+        threads: { ...s.threads, [thread.id]: thread },
+        currentThreadId: thread.id,
+      }));
+      get()._saveThread(thread.id);
+    },
+
+    switchToThread: (threadId) => {
+      const { threads, streamState } = get();
+      if (!threads[threadId]) return;
+      set({ currentThreadId: threadId });
+
+      const thread = threads[threadId]!;
+      const lastMsg = thread.messages[thread.messages.length - 1];
+      const currentStream = streamState[threadId];
+      const wid = get().workspaceId;
+
+      if (
+        !currentStream &&
+        lastMsg?.role === "tool" &&
+        lastMsg.type === "tool_request"
+      ) {
+        get()._setStreamState(threadId, {
+          status: "awaiting_user",
+          workspaceId: wid,
+        });
+      }
+    },
+
+    deleteThread: (threadId) => {
+      const { threads, currentThreadId, workspaceId } = get();
+      const newThreads = { ...threads };
+      delete newThreads[threadId];
+
+      let newCurrentId = currentThreadId;
+      if (threadId === currentThreadId) {
+        newCurrentId = Object.keys(newThreads)[0] ?? "";
+        if (!newCurrentId) {
+          const fallback = newThread(crypto.randomUUID());
+          newThreads[fallback.id] = fallback;
+          newCurrentId = fallback.id;
+          saveThread(fallback, workspaceId);
+        }
+      }
+
+      set({ threads: newThreads, currentThreadId: newCurrentId });
+      deleteThreadFromStorage(threadId);
+    },
+
+    duplicateThread: (threadId) => {
+      const { threads, workspaceId } = get();
+      const original = threads[threadId];
+      if (!original) return;
+
+      const copy: ChatThread = {
+        ...structuredClone(original),
+        id: crypto.randomUUID(),
+        title: `${original.title} (copy)`,
+        createdAt: new Date().toISOString(),
+        lastModified: new Date().toISOString(),
+      };
+
+      set((s) => ({ threads: { ...s.threads, [copy.id]: copy } }));
+      saveThread(copy, workspaceId);
+    },
+
+    // ── Message sending ────────────────────────────────────────────────────
+
+    addUserMessageAndStreamResponse: async ({
+      userMessage,
+      threadId,
+      attachments,
+    }) => {
+      const {
+        threads,
+        streamState,
+        chatMode,
+        autoApproveEdits,
+        autoApproveTerminal,
+        workspaceId,
+      } = get();
+      const thread = threads[threadId];
+      if (!thread) return;
+
+      if (streamState[threadId]) {
+        await get().abortRunning(threadId);
+      }
+
+      if (thread.state.currentCheckpointIdx !== null) {
+        const idx = thread.state.currentCheckpointIdx;
+        get()._setThreadState(threadId, {
+          messages: thread.messages.slice(0, idx + 1),
+          state: { ...thread.state, currentCheckpointIdx: null },
+        });
+      }
+
+      if (thread.messages.length === 0) {
+        get()._addCheckpoint(threadId, {
+          role: "checkpoint",
+          type: "user_edit",
+          snapshotByPath: {},
+          userModifications: { snapshotByPath: {} },
+        });
+      }
+
+      const attachmentSummary = _buildAttachmentSummary(
+        attachments ?? thread.state.stagingSelections,
+      );
+      const fullContent = attachmentSummary
+        ? `${userMessage}\n\n---\nATTACHMENTS\n${attachmentSummary}`
+        : userMessage;
+
+      get()._addMessageToThread(threadId, {
+        role: "user",
+        content: fullContent,
+        displayContent: userMessage,
+        attachments: attachments ?? thread.state.stagingSelections,
+        state: {
+          stagingSelections: attachments ?? thread.state.stagingSelections,
+          isBeingEdited: false,
         },
+      });
 
-        // ── Thread management ──────────────────────────────────────────────────
-
-        openNewThread: () => {
-            const { threads } = get();
-            for (const [id, thread] of Object.entries(threads)) {
-                if (thread && thread.messages.length === 0) {
-                    set({ currentThreadId: id });
-                    return;
-                }
-            }
-            const thread = newThread(crypto.randomUUID());
-            set((s) => ({
-                threads: { ...s.threads, [thread.id]: thread },
-                currentThreadId: thread.id,
-            }));
-            get()._saveThread(thread.id);
+      get()._setThreadState(threadId, {
+        state: {
+          ...get().threads[threadId]!.state,
+          stagingSelections: [],
+          currentCheckpointIdx: null,
         },
+      });
 
-        switchToThread: (threadId) => {
-            const { threads, streamState } = get();
-            if (!threads[threadId]) return;
-            set({ currentThreadId: threadId });
+      const callbacks = _buildAgentCallbacks(
+        threadId,
+        get,
+        chatMode,
+        autoApproveEdits,
+        autoApproveTerminal,
+        workspaceId,
+      );
+      const abortController = new AbortController();
 
-            const thread = threads[threadId]!;
-            const lastMsg = thread.messages[thread.messages.length - 1];
-            const currentStream = streamState[threadId];
-            const wid = get().workspaceId;
+      // ← workspaceId now included
+      get()._setStreamState(threadId, {
+        status: "streaming",
+        workspaceId,
+        partialText: "",
+        partialReasoning: "",
+        partialToolCall: null,
+        abort: () => abortController.abort(),
+      });
 
-            if (!currentStream && lastMsg?.role === "tool" && lastMsg.type === "tool_request") {
-                get()._setStreamState(threadId, {
-                    status: "awaiting_user",
-                    workspaceId: wid,
-                });
-            }
+      runChatAgent(callbacks, { abortSignal: abortController.signal }).catch(
+        (err) => {
+          console.error("[ChatAgent] Unhandled error:", err);
+          get()._setStreamState(threadId, {
+            status: "error",
+            message: err.message ?? "An unexpected error occurred.",
+            fullError: err,
+          });
         },
+      );
+    },
 
-        deleteThread: (threadId) => {
-            const { threads, currentThreadId, workspaceId } = get();
-            const newThreads = { ...threads };
-            delete newThreads[threadId];
+    editUserMessageAndStreamResponse: async ({
+      userMessage,
+      messageIdx,
+      threadId,
+    }) => {
+      const { threads } = get();
+      const thread = threads[threadId];
+      if (!thread) return;
 
-            let newCurrentId = currentThreadId;
-            if (threadId === currentThreadId) {
-                newCurrentId = Object.keys(newThreads)[0] ?? "";
-                if (!newCurrentId) {
-                    const fallback = newThread(crypto.randomUUID());
-                    newThreads[fallback.id] = fallback;
-                    newCurrentId = fallback.id;
-                    saveThread(fallback, workspaceId);
-                }
-            }
+      const targetMsg = thread.messages[messageIdx];
+      if (!targetMsg || targetMsg.role !== "user") {
+        throw new Error("Can only edit user messages.");
+      }
 
-            set({ threads: newThreads, currentThreadId: newCurrentId });
-            deleteThreadFromStorage(threadId);
+      const attachments = targetMsg.attachments ?? [];
+      get()._setThreadState(threadId, {
+        messages: thread.messages.slice(0, messageIdx),
+      });
+      await get().addUserMessageAndStreamResponse({
+        userMessage,
+        threadId,
+        attachments,
+      });
+    },
+
+    // ── Tool approval ──────────────────────────────────────────────────────
+
+    approveLatestToolRequest: (threadId) => {
+      const {
+        threads,
+        chatMode,
+        autoApproveEdits,
+        autoApproveTerminal,
+        workspaceId,
+      } = get();
+      const thread = threads[threadId];
+      if (!thread) return;
+
+      const lastMsg = thread.messages[thread.messages.length - 1];
+      if (!(lastMsg?.role === "tool" && lastMsg.type === "tool_request"))
+        return;
+
+      const abortController = new AbortController();
+      const callbacks = _buildAgentCallbacks(
+        threadId,
+        get,
+        chatMode,
+        autoApproveEdits,
+        autoApproveTerminal,
+        workspaceId,
+      );
+
+      runChatAgent(callbacks, {
+        callThisToolFirst: lastMsg as ToolMessage<WebToolName> & {
+          type: "tool_request";
         },
+        abortSignal: abortController.signal,
+        isToolApprovalContinuation: true,
+      }).catch((err) => {
+        get()._setStreamState(threadId, {
+          status: "error",
+          message: err.message,
+          fullError: err,
+        });
+      });
+    },
 
-        duplicateThread: (threadId) => {
-            const { threads, workspaceId } = get();
-            const original = threads[threadId];
-            if (!original) return;
+    rejectLatestToolRequest: (threadId) => {
+      const { threads } = get();
+      const thread = threads[threadId];
+      if (!thread) return;
 
-            const copy: ChatThread = {
-                ...structuredClone(original),
-                id: crypto.randomUUID(),
-                title: `${original.title} (copy)`,
-                createdAt: new Date().toISOString(),
-                lastModified: new Date().toISOString(),
-            };
+      const lastMsg = thread.messages[thread.messages.length - 1];
+      if (!(lastMsg?.role === "tool" && lastMsg.type !== "invalid_params"))
+        return;
 
-            set((s) => ({ threads: { ...s.threads, [copy.id]: copy } }));
-            saveThread(copy, workspaceId);
-        },
+      get()._replaceLastMessage(threadId, {
+        ...lastMsg,
+        type: "rejected",
+        content: "Tool call was rejected by the user.",
+        result: null,
+      } as ToolMessage<WebToolName>);
 
-        // ── Message sending ────────────────────────────────────────────────────
+      get()._setStreamState(threadId, undefined);
+    },
 
-        addUserMessageAndStreamResponse: async ({ userMessage, threadId, attachments }) => {
-            const { threads, streamState, chatMode, autoApproveEdits, autoApproveTerminal, workspaceId } = get();
-            const thread = threads[threadId];
-            if (!thread) return;
+    // ── Abort ──────────────────────────────────────────────────────────────
 
-            if (streamState[threadId]) {
-                await get().abortRunning(threadId);
-            }
+    abortRunning: async (threadId) => {
+      const { streamState, threads } = get();
+      const stream = streamState[threadId];
+      if (!stream) return;
 
-            if (thread.state.currentCheckpointIdx !== null) {
-                const idx = thread.state.currentCheckpointIdx;
-                get()._setThreadState(threadId, {
-                    messages: thread.messages.slice(0, idx + 1),
-                    state: { ...thread.state, currentCheckpointIdx: null },
-                });
-            }
+      const thread = threads[threadId];
+      if (!thread) return;
 
-            if (thread.messages.length === 0) {
-                get()._addCheckpoint(threadId, {
-                    role: "checkpoint",
-                    type: "user_edit",
-                    snapshotByPath: {},
-                    userModifications: { snapshotByPath: {} },
-                });
-            }
-
-            const attachmentSummary = _buildAttachmentSummary(
-                attachments ?? thread.state.stagingSelections
-            );
-            const fullContent = attachmentSummary
-                ? `${userMessage}\n\n---\nATTACHMENTS\n${attachmentSummary}`
-                : userMessage;
-
+      if (stream.status === "streaming") {
+        if (stream.partialText || stream.partialToolCall) {
+          get()._addMessageToThread(threadId, {
+            role: "assistant",
+            displayContent: stream.partialText,
+            reasoning: stream.partialReasoning,
+            anthropicReasoning: null,
+          });
+          if (stream.partialToolCall) {
             get()._addMessageToThread(threadId, {
-                role: "user",
-                content: fullContent,
-                displayContent: userMessage,
-                attachments: attachments ?? thread.state.stagingSelections,
-                state: {
-                    stagingSelections: attachments ?? thread.state.stagingSelections,
-                    isBeingEdited: false,
+              role: "interrupted_tool",
+              name: stream.partialToolCall.name as WebToolName,
+              mcpServerName: undefined,
+            });
+          }
+        }
+        stream.abort();
+      } else if (stream.status === "tool_running") {
+        stream.abort();
+      } else if (stream.status === "awaiting_user") {
+        get().rejectLatestToolRequest(threadId);
+      } else if (stream.status === "idle") {
+        stream.abort();
+      }
+
+      get()._addCheckpoint(threadId, {
+        role: "checkpoint",
+        type: "user_edit",
+        snapshotByPath: {},
+        userModifications: { snapshotByPath: {} },
+      });
+
+      get()._setStreamState(threadId, undefined);
+    },
+
+    dismissStreamError: (threadId) => {
+      get()._setStreamState(threadId, undefined);
+    },
+
+    // ── Staging selections ─────────────────────────────────────────────────
+
+    addStagingSelection: (selection) => {
+      const { currentThreadId, threads } = get();
+      const thread = threads[currentThreadId];
+      if (!thread) return;
+
+      const focusedIdx = get().getFocusedMessageIdx();
+      if (focusedIdx !== undefined) {
+        const msg = thread.messages[focusedIdx];
+        if (msg?.role !== "user") return;
+        get()._setMessageState(currentThreadId, focusedIdx, {
+          stagingSelections: _dedupeSelection(
+            msg.state.stagingSelections,
+            selection,
+          ),
+        });
+      } else {
+        get()._setThreadState(currentThreadId, {
+          state: {
+            ...thread.state,
+            stagingSelections: _dedupeSelection(
+              thread.state.stagingSelections,
+              selection,
+            ),
+          },
+        });
+      }
+    },
+
+    removeStagingSelection: (index) => {
+      const { currentThreadId, threads } = get();
+      const thread = threads[currentThreadId];
+      if (!thread) return;
+
+      const focusedIdx = get().getFocusedMessageIdx();
+      if (focusedIdx !== undefined) {
+        const msg = thread.messages[focusedIdx];
+        if (msg?.role !== "user") return;
+        get()._setMessageState(currentThreadId, focusedIdx, {
+          stagingSelections: msg.state.stagingSelections.filter(
+            (_, i) => i !== index,
+          ),
+        });
+      } else {
+        get()._setThreadState(currentThreadId, {
+          state: {
+            ...thread.state,
+            stagingSelections: thread.state.stagingSelections.filter(
+              (_, i) => i !== index,
+            ),
+          },
+        });
+      }
+    },
+
+    clearStagingSelections: () => {
+      const { currentThreadId, threads } = get();
+      const thread = threads[currentThreadId];
+      if (!thread) return;
+      get()._setThreadState(currentThreadId, {
+        state: { ...thread.state, stagingSelections: [] },
+      });
+    },
+
+    // ── Message editing focus ──────────────────────────────────────────────
+
+    setFocusedMessageIdx: (messageIdx) => {
+      const { currentThreadId, threads } = get();
+      const thread = threads[currentThreadId];
+      if (!thread) return;
+      get()._setThreadState(currentThreadId, {
+        state: { ...thread.state, focusedMessageIdx: messageIdx },
+      });
+    },
+
+    getFocusedMessageIdx: () => {
+      const { currentThreadId, threads } = get();
+      const thread = threads[currentThreadId];
+      if (!thread) return undefined;
+      const idx = thread.state.focusedMessageIdx;
+      if (idx === undefined) return undefined;
+      const msg = thread.messages[idx];
+      if (!msg || msg.role !== "user") return undefined;
+      return idx;
+    },
+
+    // ── Codespan links ─────────────────────────────────────────────────────
+
+    getCodespanLink: ({ codespanStr, messageIdx, threadId }) => {
+      const thread = get().threads[threadId];
+      if (!thread) return undefined;
+      return thread.state.codespanLinks[messageIdx]?.[codespanStr];
+    },
+
+    addCodespanLink: ({ text, link, messageIdx, threadId }) => {
+      const thread = get().threads[threadId];
+      if (!thread) return;
+      set((s) => {
+        const t = s.threads[threadId];
+        if (!t) return s;
+        return {
+          threads: {
+            ...s.threads,
+            [threadId]: {
+              ...t,
+              state: {
+                ...t.state,
+                codespanLinks: {
+                  ...t.state.codespanLinks,
+                  [messageIdx]: {
+                    ...t.state.codespanLinks[messageIdx],
+                    [text]: link,
+                  },
                 },
-            });
+              },
+            },
+          },
+        };
+      });
+    },
 
-            get()._setThreadState(threadId, {
-                state: {
-                    ...get().threads[threadId]!.state,
-                    stagingSelections: [],
-                    currentCheckpointIdx: null,
-                },
-            });
+    // ── Checkpoint time travel ─────────────────────────────────────────────
 
-            const callbacks = _buildAgentCallbacks(
-                threadId, get, chatMode, autoApproveEdits, autoApproveTerminal, workspaceId
-            );
-            const abortController = new AbortController();
+    jumpToCheckpointBeforeMessageIdx: async ({
+      threadId,
+      messageIdx,
+      includeUserModifications,
+    }) => {
+      const { threads, streamState } = get();
+      const thread = threads[threadId];
+      if (!thread || streamState[threadId]) return;
 
-            // ← workspaceId now included
-            get()._setStreamState(threadId, {
-                status: "streaming",
-                workspaceId,
-                partialText: "",
-                partialReasoning: "",
-                partialToolCall: null,
-                abort: () => abortController.abort(),
-            });
+      let targetCheckpoint: CheckpointEntry | null = null;
+      let targetIdx = -1;
 
-            runChatAgent(callbacks, { abortSignal: abortController.signal }).catch((err) => {
-                console.error("[ChatAgent] Unhandled error:", err);
-                get()._setStreamState(threadId, {
-                    status: "error",
-                    message: err.message ?? "An unexpected error occurred.",
-                    fullError: err,
-                });
-            });
+      for (let i = messageIdx - 1; i >= 0; i--) {
+        const msg = thread.messages[i];
+        if (isCheckpoint(msg)) {
+          targetCheckpoint = msg;
+          targetIdx = i;
+          break;
+        }
+      }
+
+      if (!targetCheckpoint || targetIdx === -1) return;
+
+      const fromIdx =
+        thread.state.currentCheckpointIdx ?? thread.messages.length - 1;
+      if (fromIdx === targetIdx) return;
+
+      const snapshotToUse = includeUserModifications
+        ? {
+            ...targetCheckpoint.snapshotByPath,
+            ...targetCheckpoint.userModifications.snapshotByPath,
+          }
+        : targetCheckpoint.snapshotByPath;
+
+      for (const [filePath, snapshot] of Object.entries(snapshotToUse)) {
+        if (snapshot) await restoreFileSnapshot(filePath, snapshot.content);
+      }
+
+      get()._setThreadState(threadId, {
+        state: { ...thread.state, currentCheckpointIdx: targetIdx },
+      });
+    },
+
+    // ── Settings ───────────────────────────────────────────────────────────
+
+    setChatMode: (mode) => set({ chatMode: mode }),
+    setAutoApprove: (type, value) => {
+      if (type === "edits") {
+        set({ autoApproveEdits: value });
+        // Sync to ChatThreadService
+        import("../app/features/ide/extensions/chat/ChatThreadService").then(
+          ({ setAutoApproveEdits }) => setAutoApproveEdits(value),
+        );
+      } else {
+        set({ autoApproveTerminal: value });
+      }
+    },
+    // ── Internals ──────────────────────────────────────────────────────────
+
+    _setStreamState: (threadId, state) => {
+      set((s) => ({ streamState: { ...s.streamState, [threadId]: state } }));
+    },
+
+    _addMessageToThread: (threadId, message) => {
+      set((s) => {
+        const thread = s.threads[threadId];
+        if (!thread) return s;
+        const updated: ChatThread = {
+          ...thread,
+          lastModified: new Date().toISOString(),
+          messages: [...thread.messages, message],
+        };
+        if (
+          message.role === "user" &&
+          thread.messages.filter((m) => m.role === "user").length === 0
+        ) {
+          updated.title =
+            message.displayContent.slice(0, 50) +
+            (message.displayContent.length > 50 ? "…" : "");
+        }
+        // Fire-and-forget persist — pass workspaceId from store
+        saveThread(updated, s.workspaceId);
+        return { threads: { ...s.threads, [threadId]: updated } };
+      });
+    },
+
+    _replaceLastMessage: (threadId, message) => {
+      const { threads } = get();
+      const thread = threads[threadId];
+      if (!thread || thread.messages.length === 0) return false;
+
+      const lastMsg = thread.messages[thread.messages.length - 1];
+      if (lastMsg.role !== "tool") return false;
+
+      set((s) => {
+        const t = s.threads[threadId];
+        if (!t) return s;
+        const msgs = [...t.messages];
+        msgs[msgs.length - 1] = message;
+        const updated = {
+          ...t,
+          lastModified: new Date().toISOString(),
+          messages: msgs,
+        };
+        saveThread(updated, s.workspaceId);
+        return { threads: { ...s.threads, [threadId]: updated } };
+      });
+
+      return true;
+    },
+
+    _addCheckpoint: (threadId, checkpoint) => {
+      get()._addMessageToThread(threadId, checkpoint);
+    },
+
+    _saveThread: (threadId) => {
+      const { threads, workspaceId } = get();
+      const thread = threads[threadId];
+      if (thread) saveThread(thread, workspaceId);
+    },
+
+    _getCurrentThread: () => {
+      const { threads, currentThreadId } = get();
+      return threads[currentThreadId];
+    },
+
+    _setThreadState: (threadId, partial) => {
+      set((s) => {
+        const thread = s.threads[threadId];
+        if (!thread) return s;
+        const updated = {
+          ...thread,
+          ...partial,
+          lastModified: new Date().toISOString(),
+        };
+        saveThread(updated as ChatThread, s.workspaceId);
+        return { threads: { ...s.threads, [threadId]: updated } };
+      });
+    },
+
+    _setMessageState: (threadId, messageIdx, partial) => {
+      set((s) => {
+        const thread = s.threads[threadId];
+        if (!thread) return s;
+        const msgs = [...thread.messages];
+        const msg = msgs[messageIdx];
+        if (!msg || msg.role !== "user") return s;
+        msgs[messageIdx] = { ...msg, state: { ...msg.state, ...partial } };
+        const updated = {
+          ...thread,
+          messages: msgs,
+          lastModified: new Date().toISOString(),
+        };
+        saveThread(updated, s.workspaceId);
+        return { threads: { ...s.threads, [threadId]: updated } };
+      });
+    },
+
+    setPlanMode: (on) => set({ planMode: on }),
+
+    _addPlan: (threadId, plan) => {
+      set((s) => ({
+        currentPlanByThread: {
+          ...s.currentPlanByThread,
+          [threadId]: plan,
         },
+      }));
+      // Also add plan as a message in the thread
+      get()._addMessageToThread(threadId, plan as any);
+    },
 
-        editUserMessageAndStreamResponse: async ({ userMessage, messageIdx, threadId }) => {
-            const { threads } = get();
-            const thread = threads[threadId];
-            if (!thread) return;
-
-            const targetMsg = thread.messages[messageIdx];
-            if (!targetMsg || targetMsg.role !== "user") {
-                throw new Error("Can only edit user messages.");
-            }
-
-            const attachments = targetMsg.attachments ?? [];
-            get()._setThreadState(threadId, {
-                messages: thread.messages.slice(0, messageIdx),
-            });
-            await get().addUserMessageAndStreamResponse({ userMessage, threadId, attachments });
+    _updatePlan: (threadId, plan) => {
+      set((s) => ({
+        currentPlanByThread: {
+          ...s.currentPlanByThread,
+          [threadId]: plan,
         },
-
-        // ── Tool approval ──────────────────────────────────────────────────────
-
-        approveLatestToolRequest: (threadId) => {
-            const { threads, chatMode, autoApproveEdits, autoApproveTerminal, workspaceId } = get();
-            const thread = threads[threadId];
-            if (!thread) return;
-
-            const lastMsg = thread.messages[thread.messages.length - 1];
-            if (!(lastMsg?.role === "tool" && lastMsg.type === "tool_request")) return;
-
-            const abortController = new AbortController();
-            const callbacks = _buildAgentCallbacks(
-                threadId, get, chatMode, autoApproveEdits, autoApproveTerminal, workspaceId
-            );
-
-            runChatAgent(callbacks, {
-                callThisToolFirst: lastMsg as ToolMessage<WebToolName> & { type: "tool_request" },
-                abortSignal: abortController.signal,
-            }).catch((err) => {
-                get()._setStreamState(threadId, {
-                    status: "error",
-                    message: err.message,
-                    fullError: err,
-                });
-            });
-        },
-
-        rejectLatestToolRequest: (threadId) => {
-            const { threads } = get();
-            const thread = threads[threadId];
-            if (!thread) return;
-
-            const lastMsg = thread.messages[thread.messages.length - 1];
-            if (!(lastMsg?.role === "tool" && lastMsg.type !== "invalid_params")) return;
-
-            get()._replaceLastMessage(threadId, {
-                ...lastMsg,
-                type: "rejected",
-                content: "Tool call was rejected by the user.",
-                result: null,
-            } as ToolMessage<WebToolName>);
-
-            get()._setStreamState(threadId, undefined);
-        },
-
-        // ── Abort ──────────────────────────────────────────────────────────────
-
-        abortRunning: async (threadId) => {
-            const { streamState, threads } = get();
-            const stream = streamState[threadId];
-            if (!stream) return;
-
-            const thread = threads[threadId];
-            if (!thread) return;
-
-            if (stream.status === "streaming") {
-                if (stream.partialText || stream.partialToolCall) {
-                    get()._addMessageToThread(threadId, {
-                        role: "assistant",
-                        displayContent: stream.partialText,
-                        reasoning: stream.partialReasoning,
-                        anthropicReasoning: null,
-                    });
-                    if (stream.partialToolCall) {
-                        get()._addMessageToThread(threadId, {
-                            role: "interrupted_tool",
-                            name: stream.partialToolCall.name as WebToolName,
-                            mcpServerName: undefined,
-                        });
-                    }
-                }
-                stream.abort();
-            } else if (stream.status === "tool_running") {
-                stream.abort();
-            } else if (stream.status === "awaiting_user") {
-                get().rejectLatestToolRequest(threadId);
-            } else if (stream.status === "idle") {
-                stream.abort();
-            }
-
-            get()._addCheckpoint(threadId, {
-                role: "checkpoint",
-                type: "user_edit",
-                snapshotByPath: {},
-                userModifications: { snapshotByPath: {} },
-            });
-
-            get()._setStreamState(threadId, undefined);
-        },
-
-        dismissStreamError: (threadId) => {
-            get()._setStreamState(threadId, undefined);
-        },
-
-        // ── Staging selections ─────────────────────────────────────────────────
-
-        addStagingSelection: (selection) => {
-            const { currentThreadId, threads } = get();
-            const thread = threads[currentThreadId];
-            if (!thread) return;
-
-            const focusedIdx = get().getFocusedMessageIdx();
-            if (focusedIdx !== undefined) {
-                const msg = thread.messages[focusedIdx];
-                if (msg?.role !== "user") return;
-                get()._setMessageState(currentThreadId, focusedIdx, {
-                    stagingSelections: _dedupeSelection(msg.state.stagingSelections, selection),
-                });
-            } else {
-                get()._setThreadState(currentThreadId, {
-                    state: {
-                        ...thread.state,
-                        stagingSelections: _dedupeSelection(
-                            thread.state.stagingSelections, selection
-                        ),
-                    },
-                });
-            }
-        },
-
-        removeStagingSelection: (index) => {
-            const { currentThreadId, threads } = get();
-            const thread = threads[currentThreadId];
-            if (!thread) return;
-
-            const focusedIdx = get().getFocusedMessageIdx();
-            if (focusedIdx !== undefined) {
-                const msg = thread.messages[focusedIdx];
-                if (msg?.role !== "user") return;
-                get()._setMessageState(currentThreadId, focusedIdx, {
-                    stagingSelections: msg.state.stagingSelections.filter((_, i) => i !== index),
-                });
-            } else {
-                get()._setThreadState(currentThreadId, {
-                    state: {
-                        ...thread.state,
-                        stagingSelections: thread.state.stagingSelections.filter((_, i) => i !== index),
-                    },
-                });
-            }
-        },
-
-        clearStagingSelections: () => {
-            const { currentThreadId, threads } = get();
-            const thread = threads[currentThreadId];
-            if (!thread) return;
-            get()._setThreadState(currentThreadId, {
-                state: { ...thread.state, stagingSelections: [] },
-            });
-        },
-
-        // ── Message editing focus ──────────────────────────────────────────────
-
-        setFocusedMessageIdx: (messageIdx) => {
-            const { currentThreadId, threads } = get();
-            const thread = threads[currentThreadId];
-            if (!thread) return;
-            get()._setThreadState(currentThreadId, {
-                state: { ...thread.state, focusedMessageIdx: messageIdx },
-            });
-        },
-
-        getFocusedMessageIdx: () => {
-            const { currentThreadId, threads } = get();
-            const thread = threads[currentThreadId];
-            if (!thread) return undefined;
-            const idx = thread.state.focusedMessageIdx;
-            if (idx === undefined) return undefined;
-            const msg = thread.messages[idx];
-            if (!msg || msg.role !== "user") return undefined;
-            return idx;
-        },
-
-        // ── Codespan links ─────────────────────────────────────────────────────
-
-        getCodespanLink: ({ codespanStr, messageIdx, threadId }) => {
-            const thread = get().threads[threadId];
-            if (!thread) return undefined;
-            return thread.state.codespanLinks[messageIdx]?.[codespanStr];
-        },
-
-        addCodespanLink: ({ text, link, messageIdx, threadId }) => {
-            const thread = get().threads[threadId];
-            if (!thread) return;
-            set((s) => {
-                const t = s.threads[threadId];
-                if (!t) return s;
-                return {
-                    threads: {
-                        ...s.threads,
-                        [threadId]: {
-                            ...t,
-                            state: {
-                                ...t.state,
-                                codespanLinks: {
-                                    ...t.state.codespanLinks,
-                                    [messageIdx]: {
-                                        ...t.state.codespanLinks[messageIdx],
-                                        [text]: link,
-                                    },
-                                },
-                            },
-                        },
-                    },
-                };
-            });
-        },
-
-        // ── Checkpoint time travel ─────────────────────────────────────────────
-
-        jumpToCheckpointBeforeMessageIdx: async ({
-            threadId, messageIdx, includeUserModifications
-        }) => {
-            const { threads, streamState } = get();
-            const thread = threads[threadId];
-            if (!thread || streamState[threadId]) return;
-
-            let targetCheckpoint: CheckpointEntry | null = null;
-            let targetIdx = -1;
-
-            for (let i = messageIdx - 1; i >= 0; i--) {
-                const msg = thread.messages[i];
-                if (isCheckpoint(msg)) {
-                    targetCheckpoint = msg;
-                    targetIdx = i;
-                    break;
-                }
-            }
-
-            if (!targetCheckpoint || targetIdx === -1) return;
-
-            const fromIdx = thread.state.currentCheckpointIdx ?? thread.messages.length - 1;
-            if (fromIdx === targetIdx) return;
-
-            const snapshotToUse = includeUserModifications
-                ? {
-                    ...targetCheckpoint.snapshotByPath,
-                    ...targetCheckpoint.userModifications.snapshotByPath,
-                }
-                : targetCheckpoint.snapshotByPath;
-
-            for (const [filePath, snapshot] of Object.entries(snapshotToUse)) {
-                if (snapshot) await restoreFileSnapshot(filePath, snapshot.content);
-            }
-
-            get()._setThreadState(threadId, {
-                state: { ...thread.state, currentCheckpointIdx: targetIdx },
-            });
-        },
-
-        // ── Settings ───────────────────────────────────────────────────────────
-
-        setChatMode: (mode) => set({ chatMode: mode }),
-        setAutoApprove: (type, value) => {
-            if (type === "edits") {
-                set({ autoApproveEdits: value });
-                // Sync to ChatThreadService
-                import("../app/features/ide/extensions/chat/ChatThreadService")
-                    .then(({ setAutoApproveEdits }) => setAutoApproveEdits(value));
-            } else {
-                set({ autoApproveTerminal: value });
-            }
-        },
-        // ── Internals ──────────────────────────────────────────────────────────
-
-        _setStreamState: (threadId, state) => {
-            set((s) => ({ streamState: { ...s.streamState, [threadId]: state } }));
-        },
-
-        _addMessageToThread: (threadId, message) => {
-            set((s) => {
-                const thread = s.threads[threadId];
-                if (!thread) return s;
-                const updated: ChatThread = {
-                    ...thread,
-                    lastModified: new Date().toISOString(),
-                    messages: [...thread.messages, message],
-                };
-                if (
-                    message.role === "user" &&
-                    thread.messages.filter((m) => m.role === "user").length === 0
-                ) {
-                    updated.title =
-                        message.displayContent.slice(0, 50) +
-                        (message.displayContent.length > 50 ? "…" : "");
-                }
-                // Fire-and-forget persist — pass workspaceId from store
-                saveThread(updated, s.workspaceId);
-                return { threads: { ...s.threads, [threadId]: updated } };
-            });
-        },
-
-        _replaceLastMessage: (threadId, message) => {
-            const { threads } = get();
-            const thread = threads[threadId];
-            if (!thread || thread.messages.length === 0) return false;
-
-            const lastMsg = thread.messages[thread.messages.length - 1];
-            if (lastMsg.role !== "tool") return false;
-
-            set((s) => {
-                const t = s.threads[threadId];
-                if (!t) return s;
-                const msgs = [...t.messages];
-                msgs[msgs.length - 1] = message;
-                const updated = {
-                    ...t,
-                    lastModified: new Date().toISOString(),
-                    messages: msgs,
-                };
-                saveThread(updated, s.workspaceId);
-                return { threads: { ...s.threads, [threadId]: updated } };
-            });
-
-            return true;
-        },
-
-        _addCheckpoint: (threadId, checkpoint) => {
-            get()._addMessageToThread(threadId, checkpoint);
-        },
-
-        _saveThread: (threadId) => {
-            const { threads, workspaceId } = get();
-            const thread = threads[threadId];
-            if (thread) saveThread(thread, workspaceId);
-        },
-
-        _getCurrentThread: () => {
-            const { threads, currentThreadId } = get();
-            return threads[currentThreadId];
-        },
-
-        _setThreadState: (threadId, partial) => {
-            set((s) => {
-                const thread = s.threads[threadId];
-                if (!thread) return s;
-                const updated = {
-                    ...thread,
-                    ...partial,
-                    lastModified: new Date().toISOString(),
-                };
-                saveThread(updated as ChatThread, s.workspaceId);
-                return { threads: { ...s.threads, [threadId]: updated } };
-            });
-        },
-
-        _setMessageState: (threadId, messageIdx, partial) => {
-            set((s) => {
-                const thread = s.threads[threadId];
-                if (!thread) return s;
-                const msgs = [...thread.messages];
-                const msg = msgs[messageIdx];
-                if (!msg || msg.role !== "user") return s;
-                msgs[messageIdx] = { ...msg, state: { ...msg.state, ...partial } };
-                const updated = {
-                    ...thread,
-                    messages: msgs,
-                    lastModified: new Date().toISOString(),
-                };
-                saveThread(updated, s.workspaceId);
-                return { threads: { ...s.threads, [threadId]: updated } };
-            });
-        },
-
-
-        setPlanMode: (on) => set({ planMode: on }),
-
-        _addPlan: (threadId, plan) => {
-            set(s => ({
-                currentPlanByThread: {
-                    ...s.currentPlanByThread,
-                    [threadId]: plan,
-                },
-            }));
-            // Also add plan as a message in the thread
-            get()._addMessageToThread(threadId, plan as any);
-        },
-
-        _updatePlan: (threadId, plan) => {
-            set(s => ({
-                currentPlanByThread: {
-                    ...s.currentPlanByThread,
-                    [threadId]: plan,
-                },
-            }));
-            // Update the plan message in the thread
-            set(s => {
-                const thread = s.threads[threadId];
-                if (!thread) return s;
-                const msgs = thread.messages.map(m =>
-                    (m as any).role === "plan" && (m as any).id === plan.id
-                        ? plan
-                        : m
-                );
-                const updated = { ...thread, messages: msgs as any };
-                saveThread(updated, s.workspaceId);
-                return { threads: { ...s.threads, [threadId]: updated } };
-            });
-        },
-
-    }))
+      }));
+      // Update the plan message in the thread
+      set((s) => {
+        const thread = s.threads[threadId];
+        if (!thread) return s;
+        const msgs = thread.messages.map((m) =>
+          (m as any).role === "plan" && (m as any).id === plan.id ? plan : m,
+        );
+        const updated = { ...thread, messages: msgs as any };
+        saveThread(updated, s.workspaceId);
+        return { threads: { ...s.threads, [threadId]: updated } };
+      });
+    },
+  })),
 );
 
 // ── Private helpers ───────────────────────────────────────────────────────────
 
 function _buildAgentCallbacks(
-    threadId: string,
-    get: () => ChatStore,
-    chatMode: "normal" | "gather" | "agent",
-    autoApproveEdits: boolean,
-    autoApproveTerminal: boolean,
-    workspaceId: string,
-
+  threadId: string,
+  get: () => ChatStore,
+  chatMode: "normal" | "gather" | "agent",
+  autoApproveEdits: boolean,
+  autoApproveTerminal: boolean,
+  workspaceId: string,
 ): AgentCallbacks {
-    // return {
-    //     onStreamStateChange: (state) => get()._setStreamState(threadId, state),
-    //     onAddMessage: (msg) => get()._addMessageToThread(threadId, msg),
-    //     onReplaceLastMessage: (msg) => get()._replaceLastMessage(threadId, msg),
-    //     onAddCheckpoint: (cp) => get()._addCheckpoint(threadId, cp),
-    //     getMessages: () => get().threads[threadId]?.messages ?? [],
-    //     onNotify: ({ message, type }) => {
-    //         if (type === "error") toast.error(message);
-    //         else toast.success(message);
-    //     },
-    //     chatMode,
-    //     autoApproveEdits,
-    //     autoApproveTerminal,
-    // };
+  // return {
+  //     onStreamStateChange: (state) => get()._setStreamState(threadId, state),
+  //     onAddMessage: (msg) => get()._addMessageToThread(threadId, msg),
+  //     onReplaceLastMessage: (msg) => get()._replaceLastMessage(threadId, msg),
+  //     onAddCheckpoint: (cp) => get()._addCheckpoint(threadId, cp),
+  //     getMessages: () => get().threads[threadId]?.messages ?? [],
+  //     onNotify: ({ message, type }) => {
+  //         if (type === "error") toast.error(message);
+  //         else toast.success(message);
+  //     },
+  //     chatMode,
+  //     autoApproveEdits,
+  //     autoApproveTerminal,
+  // };
 
-    // Import editor store to get active file context
-    // Dynamic import avoids circular dependency
-    let activeFilePath: string | null = null;
-    let openFilePaths: string[] = [];
+  // Import editor store to get active file context
+  // Dynamic import avoids circular dependency
+  let activeFilePath: string | null = null;
+  let openFilePaths: string[] = [];
 
-    try {
-        // Read from editor store synchronously
-        const { useEditorStore } = require("../store/editor-store");
-        const editorState = useEditorStore.getState();
-        activeFilePath = editorState.activeFilePath ?? null;
-        openFilePaths = editorState.tabs.map((t: any) => t.relativePath);
-    } catch { /* best effort */ }
+  try {
+    // Read from editor store synchronously
+    const { useEditorStore } = require("../store/editor-store");
+    const editorState = useEditorStore.getState();
+    activeFilePath = editorState.activeFilePath ?? null;
+    openFilePaths = editorState.tabs.map((t: any) => t.relativePath);
+  } catch {
+    /* best effort */
+  }
 
-    return {
-        onStreamStateChange: (state) => get()._setStreamState(threadId, state),
-        onAddMessage: (msg) => get()._addMessageToThread(threadId, msg),
-        onReplaceLastMessage: (msg) => get()._replaceLastMessage(threadId, msg),
-        onAddCheckpoint: (cp) => get()._addCheckpoint(threadId, cp),
-        getMessages: () => get().threads[threadId]?.messages ?? [],
-        onNotify: ({ message, type }) => {
-            if (type === "error") toast.error(message);
-            else toast.success(message);
-        },
-        chatMode,
-        autoApproveEdits,
-        autoApproveTerminal,
-        // ── Phase 6: workspace context fields ──────────────────────────────
-        activeFilePath,
-        openFilePaths,
-        workspaceName: get().threads[threadId] ? "workspace" : undefined,
-        planMode: get().planMode,
-        onAddPlan: (plan) => get()._addPlan(threadId, plan),
-        onUpdatePlan: (plan) => get()._updatePlan(threadId, plan),
-        getCurrentPlan: () => get().currentPlanByThread[threadId] ?? null,
-    };
+  return {
+    threadId,
+    onStreamStateChange: (state) => get()._setStreamState(threadId, state),
+    onAddMessage: (msg) => get()._addMessageToThread(threadId, msg),
+    onReplaceLastMessage: (msg) => get()._replaceLastMessage(threadId, msg),
+    onAddCheckpoint: (cp) => get()._addCheckpoint(threadId, cp),
+    getMessages: () => get().threads[threadId]?.messages ?? [],
+    onNotify: ({ message, type }) => {
+      if (type === "error") toast.error(message);
+      else toast.success(message);
+    },
+    chatMode,
+    autoApproveEdits,
+    autoApproveTerminal,
+    // ── Phase 6: workspace context fields ──────────────────────────────
+    activeFilePath,
+    openFilePaths,
+    workspaceName: get().threads[threadId] ? "workspace" : undefined,
+    planMode: get().planMode,
+    onAddPlan: (plan) => get()._addPlan(threadId, plan),
+    onUpdatePlan: (plan) => get()._updatePlan(threadId, plan),
+    getCurrentPlan: () => get().currentPlanByThread[threadId] ?? null,
+  };
 }
 
 function _dedupeSelection(
-    existing: StagingSelection[],
-    newSel: StagingSelection,
+  existing: StagingSelection[],
+  newSel: StagingSelection,
 ): StagingSelection[] {
-    const isDuplicate = existing.some((s) => {
-        if (s.type !== newSel.type) return false;
-        if (s.type === "File" && newSel.type === "File")
-            return s.filePath === newSel.filePath;
-        if (s.type === "CodeSelection" && newSel.type === "CodeSelection")
-            return s.filePath === newSel.filePath && s.range[0] === newSel.range[0];
-        if (s.type === "Folder" && newSel.type === "Folder")
-            return s.folderPath === newSel.folderPath;
-        return false;
+  const isDuplicate = existing.some((s) => {
+    if (s.type !== newSel.type) return false;
+    if (s.type === "File" && newSel.type === "File")
+      return s.filePath === newSel.filePath;
+    if (s.type === "CodeSelection" && newSel.type === "CodeSelection")
+      return s.filePath === newSel.filePath && s.range[0] === newSel.range[0];
+    if (s.type === "Folder" && newSel.type === "Folder")
+      return s.folderPath === newSel.folderPath;
+    return false;
+  });
+
+  if (isDuplicate) {
+    return existing.map((s) => {
+      if (
+        s.type === "File" &&
+        newSel.type === "File" &&
+        s.filePath === newSel.filePath
+      )
+        return newSel;
+      if (
+        s.type === "CodeSelection" &&
+        newSel.type === "CodeSelection" &&
+        s.filePath === newSel.filePath &&
+        s.range[0] === newSel.range[0]
+      )
+        return newSel;
+      if (
+        s.type === "Folder" &&
+        newSel.type === "Folder" &&
+        s.folderPath === newSel.folderPath
+      )
+        return newSel;
+      return s;
     });
+  }
 
-    if (isDuplicate) {
-        return existing.map((s) => {
-            if (s.type === "File" && newSel.type === "File" && s.filePath === newSel.filePath) return newSel;
-            if (s.type === "CodeSelection" && newSel.type === "CodeSelection" && s.filePath === newSel.filePath && s.range[0] === newSel.range[0]) return newSel;
-            if (s.type === "Folder" && newSel.type === "Folder" && s.folderPath === newSel.folderPath) return newSel;
-            return s;
-        });
-    }
-
-    return [...existing, newSel];
+  return [...existing, newSel];
 }
 
 function _buildAttachmentSummary(selections: StagingSelection[]): string {
-    if (!selections.length) return "";
-    return selections
-        .map((s) => {
-            if (s.type === "File") return `File: ${s.filePath}`;
-            if (s.type === "CodeSelection") return `Code selection: ${s.filePath} lines ${s.range[0]}-${s.range[1]}`;
-            if (s.type === "Folder") return `Folder: ${s.folderPath}`;
-            return "";
-        })
-        .filter(Boolean)
-        .join("\n");
+  if (!selections.length) return "";
+  return selections
+    .map((s) => {
+      if (s.type === "File") return `File: ${s.filePath}`;
+      if (s.type === "CodeSelection")
+        return `Code selection: ${s.filePath} lines ${s.range[0]}-${s.range[1]}`;
+      if (s.type === "Folder") return `Folder: ${s.folderPath}`;
+      return "";
+    })
+    .filter(Boolean)
+    .join("\n");
 }
-
