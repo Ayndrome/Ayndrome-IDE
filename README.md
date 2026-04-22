@@ -31,12 +31,12 @@
 > Screenshots and demo recordings coming soon — have some to share? Open a PR!
 
 <!-- Add your screenshots below — drag and drop images into your PR -->
-<!--
 <div align="center">
-  <img src=".github/assets/screenshot-chat.png" width="49%" />
-  <img src=".github/assets/screenshot-diff.png" width="49%" />
+  <img src="public/app.png" width="98%" />
+  <!-- <img src=".github/assets/screenshot-diff.png" width="49%" /> -->
 </div>
 
+<!--
 <div align="center">
   <img src=".github/assets/demo-agent.gif" width="98%" />
 </div>
