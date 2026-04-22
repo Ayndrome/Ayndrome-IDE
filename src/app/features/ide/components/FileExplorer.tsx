@@ -553,6 +553,7 @@ import { useCallback, useState, useEffect } from "react";
 import { Id } from "@/convex/_generated/dataModel";
 import { useMutation } from "convex/react";
 import { api } from "@/convex/_generated/api";
+import React from "react";
 import {
     useGetFolderContents,
     useCreateFileOrFolder,
@@ -573,6 +574,7 @@ import {
     AlertDialogContent, AlertDialogDescription,
     AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
+import { Spinner } from "@/components/ui/spinner";
 import { FileIcon, FolderIcon, DefaultFolderOpenedIcon } from "@react-symbols/icons/utils";
 import { PlusIcon, FolderPlusIcon, RefreshCwIcon, ChevronRight, ChevronDown } from "lucide-react";
 
@@ -911,7 +913,7 @@ const FileTreeNode: React.FC<FileTreeNodeProps> = ({
                                 style={{ paddingLeft: `${(depth + 1) * 12 + 20}px` }}
                                 className="text-[10px] text-muted-foreground/50 py-1"
                             >
-                                Loading…
+                                Loader
                             </div>
                         )}
                         {children?.map(child => (
@@ -938,7 +940,7 @@ const FileTreeNode: React.FC<FileTreeNodeProps> = ({
                                 style={{ paddingLeft: `${(depth + 1) * 12 + 20}px` }}
                                 className="text-[10px] text-muted-foreground/40 italic py-1"
                             >
-                                empty
+                                &nbsp;
                             </div>
                         )}
                     </div>
@@ -966,7 +968,7 @@ interface FileExplorerProps {
     projectName: string;
 }
 
-export const FileExplorer: React.FC<FileExplorerProps> = ({
+export const FileExplorer: React.FC<FileExplorerProps> = React.memo(({
     projectId,
     workspaceId,
     projectName,
@@ -1243,7 +1245,7 @@ export const FileExplorer: React.FC<FileExplorerProps> = ({
 
                         {rootContents === undefined && (
                             <div className="px-4 py-2 text-xs text-muted-foreground/60">
-                                Loading…
+                               <Spinner/>
                             </div>
                         )}
 
@@ -1299,4 +1301,4 @@ export const FileExplorer: React.FC<FileExplorerProps> = ({
             </div>
         </>
     );
-};
+});

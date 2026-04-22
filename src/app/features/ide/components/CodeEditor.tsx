@@ -368,6 +368,12 @@ export const CodeEditor = () => {
 
         const extensions = [
             basicSetup,
+            // ── Height constraint: prevent CM from growing parent div ─────
+            EditorView.theme({
+                "&": { height: "100%" },
+                ".cm-scroller": { overflow: "auto", height: "100%" },
+            }),
+
             langExt,
             githubDark,
             history(),
@@ -396,9 +402,9 @@ export const CodeEditor = () => {
             ] : []),
 
             // ── Ctrl+click file paths ─────────────────────────────────────
-            ...(workspaceId ? [
-                ctrlClickExtension(handleNavigate),
-            ] : []),
+            // ...(workspaceId ? [
+            //     ctrlClickExtension(handleNavigate),
+            // ] : []),
 
             EditorView.domEventHandlers({ keydown() { } }),
 
