@@ -17,6 +17,7 @@ import { PastThreads } from "./PastThreads";
 import { StatusRing, StatusLabel } from "./StatusRing";
 import { Plus, ChevronLeft, Sparkles } from "lucide-react";
 import { ChangedFilesBar } from "./ChangedFilesBar";
+import Image from "next/image";
 // Forward-declare — Part 2 will fill these in
 // (importing here so the wiring is complete)
 import { ChatMessages } from "./ChatMessages";
@@ -209,43 +210,74 @@ const LandingPage: React.FC<{
     );
 
     return (
-        <div className="flex flex-col h-full overflow-hidden">
-            {/* Hero */}
-            <div className="flex flex-col items-center justify-center flex-1 px-4 pb-4 pt-8 text-center">
-                <div className={cn(
-                    "w-9 h-9 rounded-xl mb-4 flex items-center justify-center",
-                    "bg-gradient-to-br from-emerald-500/20 to-sky-500/10",
-                    "border border-emerald-500/20 shadow-lg shadow-emerald-500/5"
-                )}>
-                    <Sparkles size={16} className="text-emerald-400" />
-                </div>
-                <h2 className="text-[15px] font-semibold text-foreground mb-1">
-                    How can I help?
-                </h2>
-                <p className="text-[12px] text-muted-foreground/60 max-w-[220px] leading-relaxed">
-                    Ask about your code, edit files, or run commands
-                </p>
-            </div>
+        <div className="relative flex flex-col items-center justify-center flex-1 px-4 pb-4 pt-8 text-center overflow-hidden">
 
-            {/* Suggestions */}
-            <div className="px-3 pb-3 flex flex-col gap-1.5">
-                {SUGGESTED_PROMPTS.map((prompt) => (
-                    <button
-                        key={prompt}
-                        type="button"
-                        onClick={() => onSubmit(prompt)}
-                        className={cn(
-                            "text-left px-3 py-2 rounded-lg text-[12px]",
-                            "text-muted-foreground/70 hover:text-foreground",
-                            "bg-muted/20 hover:bg-muted/40",
-                            "border border-transparent hover:border-border/20",
-                            "transition-all duration-150"
-                        )}
-                    >
-                        {prompt}
-                    </button>
-                ))}
-            </div>
+    {/* 🌌 Background gradient */}
+    <div className="absolute inset-0 bg-gradient-to-b from-transparent via-[#1e1f22] to-[#141414]" />
+
+    {/* 🌀 Curved dashed paths */}
+    <svg
+  className="absolute inset-0 w-full h-full opacity-70 blur-[0.2px]"
+  viewBox="0 0 1200 800"
+  preserveAspectRatio="xMidYMid meet"
+  fill="none"
+>
+  <defs>
+    {/* Gradient for fading effect */}
+    <linearGradient id="fadeCurve" x1="0%" y1="0%" x2="100%" y2="0%">
+      <stop offset="0%" stopColor="#ffffff" stopOpacity="0" />
+      <stop offset="40%" stopColor="#ffffff" stopOpacity="0.35" />
+      <stop offset="60%" stopColor="#ffffff" stopOpacity="0.35" />
+      <stop offset="100%" stopColor="#ffffff" stopOpacity="0" />
+    </linearGradient>
+  </defs>
+
+  {/* Top arc */}
+  <path
+    d="M -200 -150 C 200 50, 100 150, 1400 150"
+    stroke="url(#fadeCurve)"
+    strokeWidth="1"
+    strokeDasharray="20 20"
+  />
+
+  {/* Middle arc */}
+  <path
+    d="M -200 300 C 200 250, 1000 250, 1400 350"
+    stroke="url(#fadeCurve)"
+    strokeWidth="1"
+    strokeDasharray="20 20"
+  />
+
+  {/* Bottom arc */}
+  <path
+    d="M -200 1550 C 200 450, 1000 450, 1400 550"
+    stroke="url(#fadeCurve)"
+    strokeWidth="1"
+    strokeDasharray="20 20"
+  />
+</svg>
+
+    {/* ✨ Glow behind logo */}
+    <div className="absolute w-40 h-40 bg-[#58a6ff]/10 blur-3xl rounded-full" />
+
+    {/* 🧠 Logo */}
+   <div className="relative z-10 flex flex-col items-center">
+    <div className="w-10 h-10 mb-4 flex items-center justify-center">
+        <Image 
+            src="/logoipsum-280.svg"
+            alt="Logo"
+            width={48}
+            height={48}
+            className="opacity-90 z-100"
+        />
+    </div>
+
+    {/* Subtitle with Curtain Effect */}
+    <p className="text-[12px] text-[#8b949e] leading-relaxed min-w-0 whitespace-nowrap overflow-hidden">
+        Kick off a new project. Make changes across your entire codebase.
+    </p>
+</div>
+
 
             {/* Input */}
             <div className="px-3 pb-3">
@@ -303,7 +335,7 @@ export const ChatPanel: React.FC<{ className?: string }> = ({ className }) => {
 
     return (
         <div className={cn(
-            "flex flex-col h-full w-full overflow-hidden",
+            "flex flex-col h-full w-full overflow-hidden min-w-0",
             "bg-[#181818] text-foreground",
             className
         )}>
@@ -317,7 +349,7 @@ export const ChatPanel: React.FC<{ className?: string }> = ({ className }) => {
                     />
 
                     {/* Messages — fills remaining space */}
-                    <div className="flex-1 overflow-hidden">
+                    <div className="flex-1 overflow-hidden min-w-0">
                         <ChatMessages threadId={threadId} />
                     </div>
 
@@ -328,7 +360,7 @@ export const ChatPanel: React.FC<{ className?: string }> = ({ className }) => {
                     <AgentStatusBar threadId={threadId} />
 
                     {/* Input */}
-                    <div className="flex-shrink-0 px-3 pb-3 pt-2">
+                    <div className="flex-shrink-0 px-3 pb-3 pt-2 min-w-0">
                         <ChatInput
                             threadId={threadId}
                             isStreaming={isStreaming}
