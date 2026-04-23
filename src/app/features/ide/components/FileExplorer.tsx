@@ -596,6 +596,9 @@ interface CreatingState {
     parentPath?: string;
     type: "file" | "folder";
     depth: number;
+    /** The relativePath of the node that triggered the create action.
+     *  Used to render the input after ONLY that specific node, not all siblings. */
+    triggerPath: string | null;
 }
 
 interface RenamingState {
@@ -745,13 +748,12 @@ const FileTreeNode: React.FC<FileTreeNodeProps> = ({
         open &&
         creating?.parentPath === item.relativePath;
 
-    // Show create input AFTER this node (as a sibling) when:
-    // this is a FILE and creating.parentPath matches this file's parentPath
-    // This handles: right-click file → New File/Folder → input appears alongside
+    // Show create input AFTER this specific file node (never after siblings):
+    // triggerPath must match THIS file exactly.
     const showCreateAfterFile =
         !isFolder &&
         creating !== null &&
-        creating.parentPath === item.parentPath;
+        creating.triggerPath === item.relativePath;
 
     const handleClick = useCallback(() => {
         onSelect(item);
@@ -778,6 +780,7 @@ const FileTreeNode: React.FC<FileTreeNodeProps> = ({
                 role="treeitem"
                 aria-expanded={isFolder ? open : undefined}
                 aria-selected={isSelected}
+              
             >
                 <ContextMenu>
                     <ContextMenuTrigger asChild>
@@ -791,6 +794,7 @@ const FileTreeNode: React.FC<FileTreeNodeProps> = ({
                                     onCancel={onRenameCancel}
                                 />
                             </div>
+
                         ) : (
                             <div
                                 tabIndex={0}
@@ -804,11 +808,12 @@ const FileTreeNode: React.FC<FileTreeNodeProps> = ({
                                             ? "#26282e"
                                             : "transparent",
                                     color: isActive ? "#bcbec4" : "#9d9fa6",
+                                    
                                 }}
                                 className={cn(
                                     "group/node flex items-center gap-1 pr-2 py-[3px]",
                                     "text-xs select-none outline-none cursor-pointer",
-                                    "transition-colors hover:bg-[#26282e]",
+                                    "transition-colors hover:bg-[#ffffff] !important",
                                     isActive && "font-medium",
                                 )}
                             >
@@ -849,13 +854,13 @@ const FileTreeNode: React.FC<FileTreeNodeProps> = ({
                                 <ContextMenuItem onSelect={() => {
                                     setOpen(true);
                                     onContextAction("new-file", item, depth);
-                                }}>
+                                }} className="hover:bg-gray-600/50">
                                     New File <ContextMenuShortcut>N</ContextMenuShortcut>
                                 </ContextMenuItem>
                                 <ContextMenuItem onSelect={() => {
                                     setOpen(true);
                                     onContextAction("new-folder", item, depth);
-                                }}>
+                                }} className="hover:bg-gray-600/50">
                                     New Folder <ContextMenuShortcut>F</ContextMenuShortcut>
                                 </ContextMenuItem>
                                 <ContextMenuSeparator />
@@ -865,12 +870,13 @@ const FileTreeNode: React.FC<FileTreeNodeProps> = ({
                             <>
                                 <ContextMenuItem onSelect={() =>
                                     onContextAction("new-file", item, depth)
-                                }>
+                                    
+                                } className="hover:bg-gray-600/50">
                                     New File Here
                                 </ContextMenuItem>
                                 <ContextMenuItem onSelect={() =>
                                     onContextAction("new-folder", item, depth)
-                                }>
+                                } className="hover:bg-gray-600/50">
                                     New Folder Here
                                 </ContextMenuItem>
                                 <ContextMenuSeparator />
@@ -878,12 +884,12 @@ const FileTreeNode: React.FC<FileTreeNodeProps> = ({
                         )}
                         <ContextMenuItem onSelect={() =>
                             onContextAction("rename", item, depth)
-                        }>
+                        } className="hover:bg-gray-600/50">
                             Rename <ContextMenuShortcut>F2</ContextMenuShortcut>
                         </ContextMenuItem>
                         <ContextMenuItem onSelect={() => {
                             navigator.clipboard.writeText(item.relativePath).catch(() => { });
-                        }}>
+                        }} className="hover:bg-gray-600/50">
                             Copy Path
                         </ContextMenuItem>
                         <ContextMenuSeparator />
@@ -973,11 +979,17 @@ export const FileExplorer: React.FC<FileExplorerProps> = React.memo(({
     workspaceId,
     projectName,
 }) => {
-    const { openFile, activeFilePath, closeTab, closeTabsMatching, tabs } = useEditorStore();
+    const { openFile, activeFilePath, closeTab, closeTabsMatching } = useEditorStore();
     const [selectedPath, setSelectedPath] = useState<string | null>(null);
     const [creating, setCreating] = useState<CreatingState | null>(null);
     const [renaming, setRenaming] = useState<RenamingState | null>(null);
     const [deletePending, setDeletePending] = useState<DeletePendingState | null>(null);
+
+    // Sync selectedPath with activeFilePath when tab manager switches tabs
+    // so only one item ever shows as highlighted in the tree
+    useEffect(() => {
+        setSelectedPath(activeFilePath);
+    }, [activeFilePath]);
 
     const rootContents = useGetFolderContents(workspaceId, undefined);
     const createInConvex = useCreateFileOrFolder();
@@ -991,21 +1003,17 @@ export const FileExplorer: React.FC<FileExplorerProps> = React.memo(({
         setSelectedPath(item.relativePath);
         if (item.type !== "file") return;
 
-        // ⚡ Cache-first: if the file is already open in a tab, just activate it
-        const alreadyOpen = tabs.find(t => t.relativePath === item.relativePath);
-        if (alreadyOpen) {
-            openFile(item.relativePath, projectId, item.name);
-            return;
-        }
-
-        // Otherwise fetch from disk and open a new tab
         try {
-            const content = await diskReadContent(workspaceId as string, item.relativePath);
+            // Read content from disk
+            const content = await diskReadContent(
+                workspaceId as string,
+                item.relativePath,
+            );
             openFile(item.relativePath, projectId, item.name, content);
         } catch (err) {
             console.error("[FileExplorer] Failed to read file:", err);
         }
-    }, [workspaceId, projectId, openFile, tabs]);
+    }, [workspaceId, projectId, openFile]);
 
     // ── Create ────────────────────────────────────────────────────────────────
 
@@ -1078,10 +1086,13 @@ export const FileExplorer: React.FC<FileExplorerProps> = React.memo(({
         const { item } = deletePending;
 
         try {
+            // 1. Disk (recursive)
             await diskDelete(workspaceId as string, item.relativePath);
+
+            // 2. Convex (recursive via mutation)
             await deleteInConvex({ workspaceId, relativePath: item.relativePath });
 
-            // Close all affected tabs (handles single file OR entire folder)
+            // Close all tabs whose path matches the deleted file/folder prefix
             closeTabsMatching(item.relativePath);
 
             if (selectedPath === item.relativePath) setSelectedPath(null);
@@ -1106,18 +1117,20 @@ export const FileExplorer: React.FC<FileExplorerProps> = React.memo(({
                 const type = action === "new-file" ? "file" : "folder";
 
                 if (item.type === "folder") {
-                    // Create inside the clicked folder
+                    // Create inside the clicked folder — no triggerPath needed
                     setCreating({
                         parentPath: item.relativePath,
                         type,
                         depth: depth + 1,
+                        triggerPath: null,
                     });
                 } else {
-                    // Create alongside the clicked file (in its parent folder)
+                    // Create alongside the clicked file — store WHICH file triggered it
                     setCreating({
-                        parentPath: item.parentPath,  // may be undefined (root)
+                        parentPath: item.parentPath,
                         type,
                         depth,
+                        triggerPath: item.relativePath,
                     });
                 }
                 break;
@@ -1151,11 +1164,11 @@ export const FileExplorer: React.FC<FileExplorerProps> = React.memo(({
         if (e.target !== e.currentTarget) return;
         if (e.key === "n" || e.key === "N") {
             e.preventDefault();
-            setCreating({ parentPath: undefined, type: "file", depth: 0 });
+            setCreating({ parentPath: undefined, type: "file", depth: 0, triggerPath: null });
         }
         if (e.key === "f" || e.key === "F") {
             e.preventDefault();
-            setCreating({ parentPath: undefined, type: "folder", depth: 0 });
+            setCreating({ parentPath: undefined, type: "folder", depth: 0, triggerPath: null });
         }
     }, []);
 
@@ -1189,7 +1202,7 @@ export const FileExplorer: React.FC<FileExplorerProps> = React.memo(({
                             <TooltipTrigger asChild>
                                 <button
                                     onClick={() => setCreating({
-                                        parentPath: undefined, type: "file", depth: 0
+                                        parentPath: undefined, type: "file", depth: 0, triggerPath: null,
                                     })}
                                     className="p-0.5 rounded text-muted-foreground hover:text-foreground hover:bg-muted transition-colors"
                                 >
@@ -1202,7 +1215,7 @@ export const FileExplorer: React.FC<FileExplorerProps> = React.memo(({
                             <TooltipTrigger asChild>
                                 <button
                                     onClick={() => setCreating({
-                                        parentPath: undefined, type: "folder", depth: 0
+                                        parentPath: undefined, type: "folder", depth: 0, triggerPath: null,
                                     })}
                                     className="p-0.5 rounded text-muted-foreground hover:text-foreground hover:bg-muted transition-colors"
                                 >
@@ -1252,7 +1265,7 @@ export const FileExplorer: React.FC<FileExplorerProps> = React.memo(({
                                 </p>
                                 <button
                                     onClick={() => setCreating({
-                                        parentPath: undefined, type: "file", depth: 0
+                                        parentPath: undefined, type: "file", depth: 0, triggerPath: null,
                                     })}
                                     className="text-xs text-primary hover:underline"
                                 >
