@@ -973,7 +973,7 @@ export const FileExplorer: React.FC<FileExplorerProps> = React.memo(({
     workspaceId,
     projectName,
 }) => {
-    const { openFile, activeFilePath, closeTab } = useEditorStore();
+    const { openFile, activeFilePath, closeTab, closeTabsMatching, tabs } = useEditorStore();
     const [selectedPath, setSelectedPath] = useState<string | null>(null);
     const [creating, setCreating] = useState<CreatingState | null>(null);
     const [renaming, setRenaming] = useState<RenamingState | null>(null);
@@ -991,17 +991,21 @@ export const FileExplorer: React.FC<FileExplorerProps> = React.memo(({
         setSelectedPath(item.relativePath);
         if (item.type !== "file") return;
 
+        // ⚡ Cache-first: if the file is already open in a tab, just activate it
+        const alreadyOpen = tabs.find(t => t.relativePath === item.relativePath);
+        if (alreadyOpen) {
+            openFile(item.relativePath, projectId, item.name);
+            return;
+        }
+
+        // Otherwise fetch from disk and open a new tab
         try {
-            // Read content from disk
-            const content = await diskReadContent(
-                workspaceId as string,
-                item.relativePath,
-            );
+            const content = await diskReadContent(workspaceId as string, item.relativePath);
             openFile(item.relativePath, projectId, item.name, content);
         } catch (err) {
             console.error("[FileExplorer] Failed to read file:", err);
         }
-    }, [workspaceId, projectId, openFile]);
+    }, [workspaceId, projectId, openFile, tabs]);
 
     // ── Create ────────────────────────────────────────────────────────────────
 
@@ -1074,26 +1078,18 @@ export const FileExplorer: React.FC<FileExplorerProps> = React.memo(({
         const { item } = deletePending;
 
         try {
-            // 1. Disk (recursive)
             await diskDelete(workspaceId as string, item.relativePath);
+            await deleteInConvex({ workspaceId, relativePath: item.relativePath });
 
-            // 2. Convex (recursive via mutation)
-            await deleteInConvex({
-                workspaceId,
-                relativePath: item.relativePath,
-            });
+            // Close all affected tabs (handles single file OR entire folder)
+            closeTabsMatching(item.relativePath);
 
-            if (activeFilePath === item.relativePath) {
-                closeTab(item.relativePath);
-            }
-            if (selectedPath === item.relativePath) {
-                setSelectedPath(null);
-            }
+            if (selectedPath === item.relativePath) setSelectedPath(null);
         } catch (err) {
             console.error("[FileExplorer] Delete failed:", err);
         }
         setDeletePending(null);
-    }, [deletePending, workspaceId, deleteInConvex, activeFilePath, selectedPath, closeTab]);
+    }, [deletePending, workspaceId, deleteInConvex, selectedPath, closeTabsMatching]);
 
     // ── Context menu actions ──────────────────────────────────────────────────
 
