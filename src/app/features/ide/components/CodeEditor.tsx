@@ -256,7 +256,8 @@
 'use client';
 
 import { useEffect, useRef, useCallback } from "react";
-import { EditorView } from "@codemirror/view";
+import { EditorView, scrollPastEnd } from "@codemirror/view";
+
 import { EditorState } from "@codemirror/state";
 import { basicSetup } from "codemirror";
 import { javascript } from "@codemirror/lang-javascript";
@@ -383,7 +384,7 @@ export const CodeEditor = () => {
             history(),
             miniMap(),
             githubDarkIndentMarkers,
-
+            scrollPastEnd(),
             suggestions({
                 fileName: activeTab?.fileName ?? "index.ts",
                 debounceRef,
