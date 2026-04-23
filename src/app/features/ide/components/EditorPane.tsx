@@ -59,6 +59,8 @@ export const EditorPane = () => {
     const { tabs } = useEditorStore();
     const { projectId } = useIDEStore();
 
+    const hasTabs = tabs.length > 0;
+
     return (
         <div
             className="flex flex-col h-full overflow-hidden"
@@ -67,19 +69,21 @@ export const EditorPane = () => {
             {/* Streaming progress bar */}
             <StreamingIndicator />
 
-            {/* File tab bar */}
+            
+            {hasTabs && (
+                <div
+                    className="flex items-center shrink-0 overflow-x-auto"
+                    style={{
+                        backgroundColor: "#141414", 
+                        borderBottom: "1px solid #30363d",
+                    }}
+                >
+                    <FileTabManager projectId={projectId} />
+                </div>
+            )}
 
-            <div
-                className="flex items-center shrink-0 overflow-x-auto"
-                style={{
-                    backgroundColor: "#2b2d30",
-                    borderBottom: "1px solid #3c3f41",
-                }}
-            >
-                <FileTabManager projectId={projectId} />
-            </div>
-
-            {tabs.length > 0 ? <CodeEditor /> : <EmptyEditor />}
+            {/* Editor / Empty State */}
+            {hasTabs ? <CodeEditor /> : <EmptyEditor />}
         </div>
     );
 };
