@@ -6,9 +6,12 @@
 
 'use client';
 
+import { useEffect } from "react";
 import { cn } from "@/lib/utils";
 import { Id } from "@/convex/_generated/dataModel";
 import { useEditorStore } from "@/src/store/editor-store";
+import { useIDEStore } from "@/src/store/ide-store";
+import { useGetAllFiles } from "@/src/app/features/projects/hooks/use-file";
 import { FileIcon } from "@react-symbols/icons/utils";
 import { ScrollArea, ScrollBar } from "@/components/ui/scroll-area";
 import { XIcon, ChevronRightIcon } from "lucide-react";
@@ -145,7 +148,23 @@ export const FileTabManager: React.FC<FileTabManagerProps> = ({ projectId }) => 
         activeFilePath,
         setActiveFile,
         closeTab,
+        closeTabsMatching,
     } = useEditorStore();
+
+    const { workspaceId } = useIDEStore();
+
+    // ── Bug 4: close tabs when files deleted outside the IDE ──────────────────
+    // Convex keeps a live list of all files. When that list updates (e.g. a file
+    // is removed via terminal `rm`), any open tab for that path gets closed.
+    const allFiles = useGetAllFiles((workspaceId || null) as Id<"workspaces"> | null);
+    useEffect(() => {
+        if (!allFiles) return; // still loading — don't act
+        const known = new Set(allFiles.map(f => f.relativePath));
+        // Find all open tabs that are no longer in Convex
+        const stale = tabs.filter(t => !known.has(t.relativePath));
+        stale.forEach(t => closeTabsMatching(t.relativePath));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [allFiles]);
 
     // Filter tabs to only those belonging to this project
     const projectTabs = projectId

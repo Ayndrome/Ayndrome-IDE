@@ -119,7 +119,6 @@
 //     reset: () => set({ tabs: [], activeFileId: null }),
 // }));
 
-
 // src/store/editor-store.ts — migrated to disk-based paths
 
 import { create } from "zustand";
@@ -127,114 +126,134 @@ import { Id } from "@/convex/_generated/dataModel";
 import { EditorView } from "@codemirror/view";
 
 export interface OpenTab {
-    relativePath: string;           // "src/components/Button.tsx" — primary key
-    projectId: Id<"projects">;
-    fileName: string;           // last segment "Button.tsx"
-    isDirty: boolean;
-    content: string;
-    savedContent: string;
+  relativePath: string; // "src/components/Button.tsx" — primary key
+  projectId: Id<"projects">;
+  fileName: string; // last segment "Button.tsx"
+  isDirty: boolean;
+  content: string;
+  savedContent: string;
 }
 
 interface EditorState {
-    view: EditorView | null;
-    setView: (view: EditorView | null) => void;
+  view: EditorView | null;
+  setView: (view: EditorView | null) => void;
 
-    tabs: OpenTab[];
-    activeFilePath: string | null;   // relativePath of active tab
+  tabs: OpenTab[];
+  activeFilePath: string | null; // relativePath of active tab
 
-    activeTab: () => OpenTab | null;
+  activeTab: () => OpenTab | null;
 
-    openFile: (
-        relativePath: string,
-        projectId: Id<"projects">,
-        fileName: string,
-        content?: string,
-    ) => void;
+  openFile: (
+    relativePath: string,
+    projectId: Id<"projects">,
+    fileName: string,
+    content?: string,
+  ) => void;
 
-    closeTab: (relativePath: string) => void;
-    setActiveFile: (relativePath: string) => void;
-    updateContent: (relativePath: string, content: string) => void;
-    markSaved: (relativePath: string, savedContent: string) => void;
-    resetProject: (projectId: Id<"projects">) => void;
-    reset: () => void;
+  closeTab: (relativePath: string) => void;
+  /** Close every tab whose path equals `pathOrPrefix` OR starts with `pathOrPrefix/`.
+   *  Used when deleting files or entire folders from the file tree. */
+  closeTabsMatching: (pathOrPrefix: string) => void;
+  setActiveFile: (relativePath: string) => void;
+  updateContent: (relativePath: string, content: string) => void;
+  markSaved: (relativePath: string, savedContent: string) => void;
+  resetProject: (projectId: Id<"projects">) => void;
+  reset: () => void;
 }
 
 export const useEditorStore = create<EditorState>((set, get) => ({
-    tabs: [],
-    activeFilePath: null,
-    view: null,
+  tabs: [],
+  activeFilePath: null,
+  view: null,
 
-    setView: (view) => set({ view }),
+  setView: (view) => set({ view }),
 
-    activeTab: () => {
-        const { tabs, activeFilePath } = get();
-        return tabs.find(t => t.relativePath === activeFilePath) ?? null;
-    },
+  activeTab: () => {
+    const { tabs, activeFilePath } = get();
+    return tabs.find((t) => t.relativePath === activeFilePath) ?? null;
+  },
 
-    openFile: (relativePath, projectId, fileName, content = "") => {
-        const existing = get().tabs.find(
-            t => t.relativePath === relativePath && t.projectId === projectId
-        );
-        if (!existing) {
-            set(s => ({
-                tabs: [
-                    ...s.tabs,
-                    {
-                        relativePath,
-                        projectId,
-                        fileName,
-                        isDirty: false,
-                        content,
-                        savedContent: content,
-                    },
-                ],
-                activeFilePath: relativePath,
-            }));
-        } else {
-            set({ activeFilePath: relativePath });
-        }
-    },
+  openFile: (relativePath, projectId, fileName, content = "") => {
+    const existing = get().tabs.find(
+      (t) => t.relativePath === relativePath && t.projectId === projectId,
+    );
+    if (!existing) {
+      set((s) => ({
+        tabs: [
+          ...s.tabs,
+          {
+            relativePath,
+            projectId,
+            fileName,
+            isDirty: false,
+            content,
+            savedContent: content,
+          },
+        ],
+        activeFilePath: relativePath,
+      }));
+    } else {
+      set({ activeFilePath: relativePath });
+    }
+  },
 
-    closeTab: (relativePath) => {
-        const { tabs, activeFilePath } = get();
-        const idx = tabs.findIndex(t => t.relativePath === relativePath);
-        const remaining = tabs.filter(t => t.relativePath !== relativePath);
-        const newActive = activeFilePath === relativePath
-            ? (remaining[Math.max(0, idx - 1)]?.relativePath ?? null)
-            : activeFilePath;
-        set({ tabs: remaining, activeFilePath: newActive });
-    },
+  closeTab: (relativePath) => {
+    const { tabs, activeFilePath } = get();
+    const idx = tabs.findIndex((t) => t.relativePath === relativePath);
+    const remaining = tabs.filter((t) => t.relativePath !== relativePath);
+    const newActive =
+      activeFilePath === relativePath
+        ? (remaining[Math.max(0, idx - 1)]?.relativePath ?? null)
+        : activeFilePath;
+    set({ tabs: remaining, activeFilePath: newActive });
+  },
 
-    setActiveFile: (relativePath) => set({ activeFilePath: relativePath }),
+  closeTabsMatching: (pathOrPrefix) => {
+    const { tabs, activeFilePath } = get();
+    const prefix = pathOrPrefix + "/";
+    const remaining = tabs.filter(
+      (t) =>
+        t.relativePath !== pathOrPrefix && !t.relativePath.startsWith(prefix),
+    );
+    const activeStillOpen = remaining.some(
+      (t) => t.relativePath === activeFilePath,
+    );
+    const newActive = activeStillOpen
+      ? activeFilePath
+      : (remaining[remaining.length - 1]?.relativePath ?? null);
+    set({ tabs: remaining, activeFilePath: newActive });
+  },
 
-    updateContent: (relativePath, content) => {
-        set(s => ({
-            tabs: s.tabs.map(t =>
-                t.relativePath === relativePath
-                    ? { ...t, content, isDirty: content !== t.savedContent }
-                    : t
-            ),
-        }));
-    },
+  setActiveFile: (relativePath) => set({ activeFilePath: relativePath }),
 
-    markSaved: (relativePath, savedContent) => {
-        set(s => ({
-            tabs: s.tabs.map(t =>
-                t.relativePath === relativePath
-                    ? { ...t, savedContent, content: savedContent, isDirty: false }
-                    : t
-            ),
-        }));
-    },
+  updateContent: (relativePath, content) => {
+    set((s) => ({
+      tabs: s.tabs.map((t) =>
+        t.relativePath === relativePath
+          ? { ...t, content, isDirty: content !== t.savedContent }
+          : t,
+      ),
+    }));
+  },
 
-    resetProject: (projectId) => {
-        const { tabs, activeFilePath } = get();
-        const remaining = tabs.filter(t => t.projectId !== projectId);
-        const newActive = remaining.find(t => t.relativePath === activeFilePath)
-            ? activeFilePath
-            : (remaining[0]?.relativePath ?? null);
-        set({ tabs: remaining, activeFilePath: newActive });
-    },
+  markSaved: (relativePath, savedContent) => {
+    set((s) => ({
+      tabs: s.tabs.map((t) =>
+        t.relativePath === relativePath
+          ? { ...t, savedContent, content: savedContent, isDirty: false }
+          : t,
+      ),
+    }));
+  },
 
-    reset: () => set({ tabs: [], activeFilePath: null }),
+  resetProject: (projectId) => {
+    const { tabs, activeFilePath } = get();
+    const remaining = tabs.filter((t) => t.projectId !== projectId);
+    const newActive = remaining.find((t) => t.relativePath === activeFilePath)
+      ? activeFilePath
+      : (remaining[0]?.relativePath ?? null);
+    set({ tabs: remaining, activeFilePath: newActive });
+  },
+
+  reset: () => set({ tabs: [], activeFilePath: null }),
 }));

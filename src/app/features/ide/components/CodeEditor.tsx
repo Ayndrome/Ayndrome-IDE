@@ -256,8 +256,8 @@
 'use client';
 
 import { useEffect, useRef, useCallback } from "react";
-import { EditorView } from "@codemirror/view";
-import { EditorState } from "@codemirror/state";
+import { EditorView, scrollPastEnd } from "@codemirror/view";
+import { Compartment, EditorState } from "@codemirror/state";
 import { basicSetup } from "codemirror";
 import { javascript } from "@codemirror/lang-javascript";
 import { python } from "@codemirror/lang-python";
@@ -268,8 +268,6 @@ import { useDiffStore } from "@/src/store/diff-store";
 import { useStreamingWriterStore } from "@/src/store/streaming-writer-store";
 import { useIDEStore } from "@/src/store/ide-store";
 import { miniMap } from "./minmap";
-// indentationMarkers now exported from theme.ts as githubDarkIndentMarkers
-
 import { suggestions } from "../extensions/autocompletion";
 import { useSaveShortcut } from "../../projects/hooks/use-save-shortcut";
 import { diffDecorationExtension } from "../extensions/editor/diff-decoration";
@@ -277,19 +275,18 @@ import { streamingWriterExtension } from "../extensions/editor/streaming-writer"
 import {
     getLspClient,
     languageFromPath,
-    toFileUri,
 } from "../extensions/editor/lsp-client";
 import { lspExtension } from "../extensions/editor/lsp-extension";
-import { ctrlClickExtension } from "../extensions/editor/ctrl-click";
-import { oneDark } from '@codemirror/theme-one-dark'
 
 export const CodeEditor = () => {
     useSaveShortcut();
 
-    const editorRef = useRef<HTMLDivElement>(null);
-    const viewRef = useRef<EditorView | null>(null);
+    const editorRef   = useRef<HTMLDivElement>(null);
+    const viewRef     = useRef<EditorView | null>(null);
     const debounceRef = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
     const filePathRef = useRef<string | null>(null);
+    // Compartment lets us hot-swap the language extension without rebuilding the view
+    const langCompartment = useRef(new Compartment());
 
     const { activeTab: getActiveTab, updateContent, setView, openFile } = useEditorStore();
     const {
@@ -305,15 +302,13 @@ export const CodeEditor = () => {
 
     const activeTab = getActiveTab();
 
-    // ── Navigate to file (go-to-def + Ctrl+click) ────────────────────────────
+    // ── Navigate to file (go-to-def) ─────────────────────────────────────────
 
     const handleNavigate = useCallback(async (
         targetPath: string,
         line: number,
     ) => {
         if (!workspaceId || !projectId) return;
-
-        // Read content from disk
         try {
             const params = new URLSearchParams({
                 workspaceId: workspaceId as string,
@@ -322,113 +317,68 @@ export const CodeEditor = () => {
             const res = await fetch(`/api/files?${params}`);
             if (!res.ok) return;
             const { content } = await res.json();
-
-            openFile(
-                targetPath,
-                projectId,
-                targetPath.split("/").pop() ?? targetPath,
-                content ?? "",
-            );
-
-            // Jump to line after editor mounts
+            openFile(targetPath, projectId, targetPath.split("/").pop() ?? targetPath, content ?? "");
             setTimeout(() => {
                 const view = viewRef.current;
                 if (!view || line === 0) return;
                 const docLine = view.state.doc.line(Math.min(line + 1, view.state.doc.lines));
-                view.dispatch({
-                    selection: { anchor: docLine.from },
-                    scrollIntoView: true,
-                });
-            }, 150);
-
+                view.dispatch({ selection: { anchor: docLine.from }, scrollIntoView: true });
+            }, 50);
         } catch (err) {
             console.error("[CodeEditor] navigate failed:", err);
         }
     }, [workspaceId, projectId, openFile]);
 
-    // ── Mount editor ──────────────────────────────────────────────────────────
+    // ── Mount: create the view ONCE ───────────────────────────────────────────
+    // Never destroyed until the component unmounts.
 
     useEffect(() => {
         if (!editorRef.current) return;
 
-        const filePath = activeTab?.relativePath ?? null;
-        filePathRef.current = filePath;
+        const initialPath = useEditorStore.getState().activeTab()?.relativePath ?? null;
+        const initialContent = useEditorStore.getState().activeTab()?.content ?? "";
+        filePathRef.current = initialPath;
 
-        const language = filePath ? languageFromPath(filePath) : null;
-        const langExt = filePath?.endsWith(".py")
-            ? python()
-            : javascript({ typescript: true, jsx: true });
-
-        // LSP client for this file's language
-        const lspClient = (language && workspaceId && filePath)
-            ? getLspClient(
-                workspaceId as string,
-                language,
-                "file:///workspace",
-            )
-            : null;
-
-        const extensions = [
-            basicSetup,
-            // ── Height constraint: prevent CM from growing parent div ─────
-            EditorView.theme({
-                "&": { height: "100%" },
-                ".cm-scroller": { overflow: "auto", height: "100%" },
-            }),
-
-            langExt,
-            githubDark,
-            
-            
-            history(),
-            miniMap(),
-            githubDarkIndentMarkers,
-
-            suggestions({
-                fileName: activeTab?.fileName ?? "index.ts",
-                debounceRef,
-            }),
-
-            // ── Diff decorations ──────────────────────────────────────────
-            ...(filePath ? [
-                diffDecorationExtension(
-                    (hunkId, fp) => acceptHunk(fp, hunkId),
-                    (hunkId, fp) => rejectHunk(fp, hunkId),
-                    filePath,
-                ),
-            ] : []),
-
-            // ── Streaming writer ──────────────────────────────────────────
-            streamingWriterExtension(),
-
-            // ── LSP ───────────────────────────────────────────────────────
-            ...(lspClient && filePath ? [
-                lspExtension(lspClient, filePath, handleNavigate),
-            ] : []),
-
-            // ── Ctrl+click file paths ─────────────────────────────────────
-            // ...(workspaceId ? [
-            //     ctrlClickExtension(handleNavigate),
-            // ] : []),
-
-            EditorView.domEventHandlers({ keydown() { } }),
-
-            // Content sync (skip during streaming)
-            EditorView.updateListener.of((update) => {
-                if (!update.docChanged) return;
-                const path = filePathRef.current;
-                if (!path) return;
-                const isStreaming = useStreamingWriterStore
-                    .getState().isStreaming(path);
-                if (isStreaming) return;
-                updateContent(path, update.state.doc.toString());
-            }),
-        ];
+        const langExt = initialPath?.endsWith(".py") ? python() : javascript({ typescript: true, jsx: true });
 
         const view = new EditorView({
             state: EditorState.create({
-                doc: activeTab?.content ?? "// Select a file to start editing\n",
-                extensions,
+                doc: initialContent,
+                extensions: [
+                    basicSetup,
+                    // Height: fill parent, scroll inside
+                    EditorView.theme({
+                        "&": { height: "100%" },
+                        ".cm-scroller": { overflow: "auto", height: "100%" },
+                    }),
+                    // Language — wrapped in a compartment so we can reconfigure on tab switch
+                    langCompartment.current.of(langExt),
+                    githubDark,
+                    history(),
+                    miniMap(),
+                    githubDarkIndentMarkers,
+                    scrollPastEnd(),
+                    suggestions({ fileName: initialPath?.split("/").pop() ?? "index.ts", debounceRef }),
+                    // Diff decorations
+                    ...(initialPath ? [
+                        diffDecorationExtension(
+                            (hunkId, fp) => acceptHunk(fp, hunkId),
+                            (hunkId, fp) => rejectHunk(fp, hunkId),
+                            initialPath,
+                        ),
+                    ] : []),
+                    // Streaming writer
+                    streamingWriterExtension(),
+                    // Content sync listener
+                    EditorView.updateListener.of((update) => {
+                        if (!update.docChanged) return;
+                        const path = filePathRef.current;
+                        if (!path) return;
+                        if (useStreamingWriterStore.getState().isStreaming(path)) return;
+                        updateContent(path, update.state.doc.toString());
+                    }),
+                    EditorView.domEventHandlers({ keydown() {} }),
+                ],
             }),
             parent: editorRef.current,
         });
@@ -436,23 +386,63 @@ export const CodeEditor = () => {
         viewRef.current = view;
         setView(view);
 
-        if (filePath) {
-            registerDiffView(filePath, view);
-            registerStreamView(filePath, view);
+        if (initialPath) {
+            registerDiffView(initialPath, view);
+            registerStreamView(initialPath, view);
         }
 
         return () => {
-            if (filePath) {
-                unregisterDiffView(filePath);
-                unregisterStreamView(filePath);
-            }
+            const fp = filePathRef.current;
+            if (fp) { unregisterDiffView(fp); unregisterStreamView(fp); }
             view.destroy();
             viewRef.current = null;
         };
         // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, []); // only runs on mount/unmount
+
+    // ── Swap: when active tab changes, swap doc + language ────────────────────
+    // This runs AFTER mount. It dispatches a single transaction — no view rebuild.
+
+    useEffect(() => {
+        const view = viewRef.current;
+        if (!view) return;
+
+        const newPath = activeTab?.relativePath ?? null;
+        const newContent = activeTab?.content ?? "";
+        const oldPath = filePathRef.current;
+
+        // Un-register old path from diff/stream stores
+        if (oldPath && oldPath !== newPath) {
+            unregisterDiffView(oldPath);
+            unregisterStreamView(oldPath);
+        }
+
+        filePathRef.current = newPath;
+
+        // Reconfigure language compartment
+        const newLangExt = newPath?.endsWith(".py") ? python() : javascript({ typescript: true, jsx: true });
+
+        // Atomically replace doc + reconfigure language in one transaction
+        const currentDoc = view.state.doc.toString();
+        view.dispatch({
+            changes: currentDoc !== newContent
+                ? { from: 0, to: currentDoc.length, insert: newContent }
+                : undefined,
+            effects: langCompartment.current.reconfigure(newLangExt),
+            // Scroll to top on file switch
+            selection: { anchor: 0 },
+            scrollIntoView: true,
+        });
+
+        // Register new path
+        if (newPath) {
+            registerDiffView(newPath, view);
+            registerStreamView(newPath, view);
+        }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [activeTab?.relativePath]);
 
-    // ── Sync on external save ─────────────────────────────────────────────────
+    // ── Sync on external saves (agent writes, etc.) ───────────────────────────
 
     useEffect(() => {
         const view = viewRef.current;
@@ -473,11 +463,8 @@ export const CodeEditor = () => {
             <div
                 ref={editorRef}
                 className="flex-1 overflow-hidden"
-                style={{ backgroundColor: "#141414" }}
+                style={{ backgroundColor: "#1e1e1e" }}
             />
         </div>
     );
 };
-
-
-
