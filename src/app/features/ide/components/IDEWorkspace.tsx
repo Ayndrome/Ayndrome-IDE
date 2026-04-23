@@ -486,6 +486,7 @@ import {
     ResizablePanel,
     ResizableHandle,
 } from "@/components/ui/resizable";
+import { setFields } from "@/void-main/src/vs/workbench/contrib/mergeEditor/browser/utils";
 
 const C = {
     border: "#3c3f41",
@@ -493,7 +494,7 @@ const C = {
 } as const;
 
 interface IDEWorkspaceProps {
-    project: Project;
+    project: Project ;
 }
 
 export const IDEWorkspace = ({ project }: IDEWorkspaceProps) => {
@@ -538,7 +539,7 @@ export const IDEWorkspace = ({ project }: IDEWorkspaceProps) => {
         window.addEventListener("mouseup", onUp);
         return () => {
             window.removeEventListener("mousemove", onMove);
-            window.removeEventListener("mouseup", onUp);
+            window.removeEventListener("mouseup", onUp);                        
         };
     }, [setBottomPanelHeight]);
 
@@ -628,6 +629,7 @@ export const IDEWorkspace = ({ project }: IDEWorkspaceProps) => {
             </div>
         );
     }
+    
 
     // ── Main layout ───────────────────────────────────────────────────────────
     // Columns (left to right):
@@ -637,132 +639,94 @@ export const IDEWorkspace = ({ project }: IDEWorkspaceProps) => {
     //   4. FileExplorer    — 200px fixed (right side, like reference)
 
     return (
-        <div
-            className="flex flex-col h-full w-full overflow-hidden"
-            style={{ backgroundColor: C.bg }}
-        >
-            <IDENavbar project={project} />
+    <div
+        className="flex flex-col h-full w-full overflow-hidden"
+        style={{ backgroundColor: C.bg }}
+    >
+        <IDENavbar project={project} />
 
-            <div className="flex flex-col flex-1 overflow-hidden min-h-0">
-                {/* Main row */}
-                <div className="flex flex-1 overflow-hidden min-h-0">
-                    <ResizablePanelGroup
-                        orientation="horizontal"
-                        className="flex-1 h-full"
-                    >
-                        {/* ── Session sidebar ── */}
-                        {showSessionSidebar && (
-                            <>
-                                <ResizablePanel
-                                    defaultSize={13}
-                                    // minSize={10}
-                                    // maxSize={20}
-                                    className="h-full min-w-0 overflow-hidden"
-                                >
-                                    <SessionSidebar />
-                                </ResizablePanel>
-                                <ResizableHandle />
-                            </>
-                        )}
+        <div className="flex flex-1 overflow-hidden min-h-0">
+            <ResizablePanelGroup orientation="horizontal" className="flex-1">
 
-                        {/* ── Chat panel (hero) ── */}
-                        <ResizablePanel
-                            defaultSize={showSessionSidebar ? 27 : 32}
-                            // minSize={22}
-                            // maxSize={55}
-                            className="h-full min-w-0 overflow-hidden"
-                        >
-                            {/* Chat panel bg = card color (#2b2d30) */}
-                            <div
-                                className="h-full w-full"
-                                style={{ backgroundColor: "#2b2d30" }}
-                            >
-                                <ChatPanel />
-                            </div>
-                        </ResizablePanel>
-
-                        <ResizableHandle />
-
-                        {/* ── Editor area ── */}
-                        {viewMode === "preview" ? (
-                            <ResizablePanel
-                                defaultSize={showSessionSidebar ? 46 : 53}
-                                className="h-full min-w-0 overflow-hidden"
-                            >
-                                <PreviewPane />
-                            </ResizablePanel>
-                        ) : viewMode === "split" ? (
-                            <>
-                                <ResizablePanel
-                                    defaultSize={28}
-                                    // minSize={18}
-                                    className="h-full min-w-0 overflow-hidden"
-                                >
-                                    <EditorPane />
-                                </ResizablePanel>
-                                <ResizableHandle />
-                                <ResizablePanel
-                                    defaultSize={17}
-                                    // minSize={10}
-                                    className="h-full min-w-0 overflow-hidden"
-                                >
-                                    <PreviewPane />
-                                </ResizablePanel>
-                            </>
-                        ) : (
-                            // code mode — editor takes remaining space
-                            <ResizablePanel
-                                defaultSize={showSessionSidebar ? 46 : 53}
-                                // minSize={20}
-                                className="h-full min-w-0 overflow-hidden"
-                            >
-                                <EditorPane />
-                            </ResizablePanel>
-                        )}
-
-                        <ResizableHandle />
-
-                        {/* ── File explorer (far right) ── */}
-                        <ResizablePanel
-                            defaultSize={14}
-                            // minSize={10}
-                            // maxSize={25}
-                            className="h-full min-w-0 overflow-hidden"
-                        >
-                            <FileExplorer
-                                projectId={project._id}
-                                workspaceId={workspaceId}
-                                projectName={project.name}
-                            />
-                        </ResizablePanel>
-                    </ResizablePanelGroup>
-                </div>
-
-                {/* ── Terminal strip ── */}
-                {showTerminal && (
+                {/* ── Session Sidebar ── */}
+                {showSessionSidebar && (
                     <>
-                        <div
-                            onMouseDown={onDragStart}
-                            className="flex items-center justify-center h-[4px] shrink-0 cursor-row-resize group"
-                            style={{ backgroundColor: C.border }}
-                        >
-                            <div
-                                className="w-10 h-[2px] rounded-full opacity-0 group-hover:opacity-100 transition-opacity"
-                                style={{ backgroundColor: "#59a869" }}
-                            />
-                        </div>
-                        <div
-                            className="shrink-0 overflow-hidden"
-                            style={{ height: `${bottomPanelHeight}px` }}
-                        >
-                            <TerminalPanel
-                                workspaceId={workspaceId as string}
-                                className="h-full"
-                            />
-                        </div>
+                        <ResizablePanel defaultSize={13} >
+                            <SessionSidebar />
+                        </ResizablePanel>
+                        <ResizableHandle />
                     </>
                 )}
-            </div>
+
+                {/* ── Chat Panel (FULL HEIGHT ALWAYS) ── */}
+                <ResizablePanel
+                    defaultSize={showSessionSidebar ? 27 : 32}
+                    
+                >
+                    <div className="h-full w-full bg-[#2b2d30]">
+                        <ChatPanel />
+                    </div>
+                </ResizablePanel>
+
+                <ResizableHandle />
+
+                {/* ── EDITOR + TERMINAL (CORE FIX) ── */}
+                <ResizablePanel
+                    defaultSize={showSessionSidebar ? 46 : 53}
+                    // minSize={25}
+                >
+                    <ResizablePanelGroup orientation="vertical">
+
+                        {/* ── Editor / Preview ── */}
+                        <ResizablePanel defaultSize={bottomPanel === "terminal" ? 70 : 100}>
+                            {viewMode === "preview" ? (
+                                <PreviewPane />
+                            ) : viewMode === "split" ? (
+                                <div className="flex h-full">
+                                    <div className="w-1/2 overflow-hidden">
+                                        <EditorPane />
+                                    </div>
+                                    <div className="w-1/2 overflow-hidden border-l border-[#3c3f41]">
+                                        <PreviewPane />
+                                    </div>
+                                </div>
+                            ) : (
+                                <EditorPane />
+                            )}
+                        </ResizablePanel>
+
+                        {/* ── Terminal INSIDE editor ── */}
+                        {bottomPanel === "terminal" && (
+                            <>
+                                <ResizableHandle />
+                                <ResizablePanel
+                                    defaultSize={30}
+                                   
+                                >
+                                    <TerminalPanel
+                                        workspaceId={workspaceId as string}
+                                        className="h-full"
+                                    />
+                                </ResizablePanel>
+                            </>
+                        )}
+
+                    </ResizablePanelGroup>
+                </ResizablePanel>
+
+                <ResizableHandle />
+
+                {/* ── File Explorer (FULL HEIGHT ALWAYS) ── */}
+                <ResizablePanel defaultSize={14}>
+                    <FileExplorer
+                        projectId={project._id}
+                        workspaceId={workspaceId}
+                        projectName={project.name}
+                    />
+                </ResizablePanel>
+
+            </ResizablePanelGroup>
         </div>
-    );
+    </div>
+);
 };
