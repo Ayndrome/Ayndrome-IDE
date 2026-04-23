@@ -37,6 +37,9 @@ type FitAddonInstance = import("@xterm/addon-fit").FitAddon;
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
+
+let FLAG = 1;
+
 type SessionStatus = "connecting" | "ready" | "error" | "disconnected";
 
 type TerminalSession = {
@@ -60,27 +63,34 @@ const MAX_TABS = 5;
 
 
 const XTERM_THEME = {
-    background: "#1e1f22",
-    foreground: "#e6edf3",
-    cursor: "#58a6ff",
-    cursorAccent: "#0d1117",
-    black: "#21262d",
-    red: "#ff7b72",
-    green: "#3fb950",
-    yellow: "#d29922",
-    blue: "#58a6ff",
-    magenta: "#bc8cff",
-    cyan: "#39c5cf",
-    white: "#b1bac4",
-    brightBlack: "#6e7681",
-    brightRed: "#ffa198",
-    brightGreen: "#56d364",
-    brightYellow: "#e3b341",
-    brightBlue: "#79c0ff",
-    brightMagenta: "#d2a8ff",
-    brightCyan: "#56d4dd",
-    brightWhite: "#f0f6fc",
-    selectionBackground: "#264f78",
+  background: "#181818",       // Matches GH.bg
+  foreground: "#d4d4d4",       // Matches GH.fg
+  cursor: "#d4d4d4",           // Matches GH.cursor
+  selectionBackground: "#264f7880", // Matches GH.bgSelection
+  
+  // Mapping ANSI colors to your GH Syntax palette
+  black: "#181818",
+  red: "#f44747",              // Matches GH.invalid
+  green: "#6a9955",            // Matches t.comment (VS Code Green)
+  yellow: "#dcdcaa",           // Matches GH.func
+  blue: "#569cd6",             // Matches GH.keyword
+  magenta: "#c586c0",          // Matches GH.keyword2
+  cyan: "#4ec9b0",             // Matches GH.typeClass
+  white: "#d4d4d4",            // Matches GH.fg
+  
+  // Bright variants for a bit more pop in the prompt
+  brightGreen: "#b5cea8",      // Matches GH.constant (Mint Green)
+  brightBlue: "#9cdcfe",       // Matches GH.param (Light Blue)
+  brightCyan: "#4ec9b0",
+};
+
+const formatPrompt = (user: string, host: string, path: string) => {
+    const green = "\x1b[1;32m"; // GH Comment Green
+    const blue = "\x1b[1;34m";  // GH Keyword Blue
+    const cyan = "\x1b[36m";    // GH TypeClass Teal
+    const reset = "\x1b[0m";
+    
+    return `${green}${user}${reset}@${blue}${host}${reset}:${cyan}${path}${reset}$ `;
 };
 
 // ── Single terminal instance ──────────────────────────────────────────────────
@@ -130,7 +140,7 @@ const TerminalInstance: React.FC<TerminalInstanceProps> = ({
                 fontSize: 13,
                 lineHeight: 1.5,
                 cursorBlink: true,
-                cursorStyle: "bar",
+                cursorStyle: "block",
                 scrollback: 5000,
                 allowProposedApi: true,
                 convertEol: true,
@@ -173,9 +183,10 @@ const TerminalInstance: React.FC<TerminalInstanceProps> = ({
             };
 
             ws.onmessage = (event) => {
-                try {
+                try {``
                     const msg: ServerMessage = JSON.parse(event.data);
-
+                    console.log(msg);
+                    
                     switch (msg.type) {
                         case "ready": {
                             // Clear connecting message, show prompt
@@ -185,7 +196,27 @@ const TerminalInstance: React.FC<TerminalInstanceProps> = ({
                         }
                         case "output": {
                             // Pass raw PTY output directly — xterm handles ANSI
-                            term.write(msg.data);
+                            let data = msg.data;
+
+                // Check if the data looks like a standard bash prompt
+                // Pattern matches: user@host:path$ 
+                const promptRegex = /^(\x1b\[\?2004h)?([\w.-]+)@([\w.-]+):(.+)\$ $/;
+                const match = data.match(promptRegex);
+
+                if (match) {
+                    const [full, bracketedPaste, user, host, path] = match;
+                    
+                    // Replace with your dynamic GH theme prompt
+                    // Use 'shashank' (you) or 'agent' based on the logic
+                    const newPrompt = formatPrompt("shashank", "agent-ide", path);
+                    
+                    // Keep bracketedPaste if it existed, then add our prompt
+                    console.log(`b-${bracketedPaste} | n-${newPrompt}`)
+                    term.write((bracketedPaste || "") + newPrompt);
+                } else {
+                    // Regular command output - pass through directly
+                    term.write(data);
+                }
                             break;
                         }
                         case "error": {
@@ -290,7 +321,7 @@ const StatusOverlay: React.FC<{ status: SessionStatus }> = ({ status }) => {
     return (
         <div className={cn(
             "absolute inset-0 flex items-center justify-center",
-            "bg-[#0d1117] z-10 pointer-events-none"
+            "bg-[#181818] z-10 pointer-events-none"
         )}>
             {status === "connecting" && (
                 <div className="flex items-center gap-2 text-[#6e7681] text-xs">
